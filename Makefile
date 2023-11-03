@@ -3,11 +3,11 @@
 
 # Files for conditional compilation
 
-PROBLEM_FILE = blast_try5_BC_v9_2.cpp
-COORDINATES_FILE = spherical_polar.cpp
-EOS_FILE = adiabatic_hydro_sr.cpp
+PROBLEM_FILE = blast_try5_BC_v9_3.cpp
+COORDINATES_FILE = schwarzschild.cpp
+EOS_FILE = adiabatic_hydro_gr.cpp
 GENERAL_EOS_FILE = noop.cpp
-RSOLVER_FILE = hllc_rel.cpp
+RSOLVER_FILE = hlle_rel_no_transform.cpp
 RSOLVER_DIR = hydro/
 MPIFFT_FILE =  
 

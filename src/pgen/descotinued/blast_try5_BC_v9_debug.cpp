@@ -14,10 +14,11 @@
 
 // C headers
 
-// Comment : this version seats on top of blast_try5_BC_v8 but
-// 	     with an imposition for t>tfinal in the boundaty condition
-// 	     also revise the angular velocity parity symmetry
-// 	     also cleaning the blast wave generator afterall we don't actually need to create a blast wave
+// Comment : this version seats on top of blast_try5_BC_v9 but
+// 	      with corrections to the boundary condition in the 
+// 	      interpolated data
+// 	      this correction was first implemented in 
+// 	      gr_blast_try5_BC_v9
 
 // C++ headers
 #include <algorithm>
@@ -58,7 +59,7 @@ int BCNtheta, BCNphi,BCNt, BCNghts;
 InterpTable3D *table;
 
 void InnerBoundary(MeshBlock *pmb, Coordinates *pcoord,
-                  AthenaArray<Real> &prim,//AthenaArray<Real> &cons,
+                  AthenaArray<Real> &prim,
                   FaceField &b, Real time, Real dt,
                   int il, int iu, int jl, int ju, int kl, int ku,
                   int ngh);
@@ -66,7 +67,7 @@ void InnerBoundary(MeshBlock *pmb, Coordinates *pcoord,
 void OutflowReader(const char *filename, InterpTable3D *table);
 
 Real DenProfile(const Real th, const Real ph, const Real tm);
-Real PressProfile(const Real th, const Real ph, const Real tm);
+Real PresProfile(const Real th, const Real ph, const Real tm);
 Real VRProfile(const Real th, const Real ph, const Real tm);
 Real VTProfile(const Real th, const Real ph, const Real tm);
 Real VPProfile(const Real th, const Real ph, const Real tm);
@@ -179,8 +180,6 @@ void Mesh::InitUserMeshData(ParameterInput *pin) {
     }
   }
   
-  //EnrollUserBoundaryFunction(BoundaryFace::inner_x1,InnerBoundary);
-
 //LFLM inclusion ends
   return;
 }
@@ -204,22 +203,10 @@ int sign( double x ) {
 //========================================================================================
 
 void MeshBlock::ProblemGenerator(ParameterInput *pin) {
-  printf("Entering MeshBlock::ProblemGenerator \n");
-
-  int il = is - NGHOST;
-  int iu = ie + NGHOST;
-  int jl = js - NGHOST;
-  int ju = je + NGHOST;
-  int kl = ks - NGHOST;
-  int ku = ke + NGHOST;
-  
-
+  //printf("Entering MeshBlock::ProblemGenerator \n");
 
   Real b0, angle;
-  AthenaArray<Real> b;
-  b.NewAthenaArray(3, ncells3, ncells2, ncells1);
- 
-
+  
   if (MAGNETIC_FIELDS_ENABLED) {
     b0 = pin->GetReal("problem", "b0");
     angle = (PI/180.0)*pin->GetReal("problem", "angle");
@@ -230,71 +217,24 @@ void MeshBlock::ProblemGenerator(ParameterInput *pin) {
   Real gm1 = gamma - 1.0;
   
   // setup uniform ambient medium with spherical over-pressured region
-  //
-  float timeshift     = 0.0  + BCtin;
   for (int k=ks; k<=ke; k++) {
     for (int j=js; j<=je; j++) {
       for (int i=is; i<=ie; i++){
-        
-        b(IB1,k,j,i) = 0.0;
-        b(IB2,k,j,i) = 0.0;
-        b(IB3,k,j,i) = 0.0;
-        
-
-	if (i>=4 and i<=8){
-		printf("i= %d",i);
-                Real rval   = pcoord->x1v(i) ;
-                Real thval  = pcoord->x2v(j) ;
-                Real phival = pcoord->x3v(k) ;
-                printf("timeshift= %6.40lf \n", timeshift);
-
-		phydro->w(IDN,k,j,i) = phydro->w1(IDN,k,j,i) = DenProfile(thval, phival, timeshift);
-		printf("            phydro->w(IDN,k,j,i) = %6.40lf \n", phydro->w(IDN,k,j,i));
-                printf("DenProfile(thval, phival, BCtin) = %6.40lf \n", DenProfile(thval, phival, timeshift));
-	        phydro->w(IPR,k,j,i) = phydro->w1(IPR,k,j,i) = PressProfile(thval, phival,timeshift);
-                printf("              phydro->w(IPR,k,j,i) = %6.40lf \n", phydro->w(IPR,k,j,i));
-                printf("PressProfile(thval, phival, BCtin) = %6.40lf \n", PressProfile(thval, phival, timeshift));
-                
-                if (RELATIVISTIC_DYNAMICS) { 
-                        phydro->w(IVX,k,j,i) = phydro->w1(IVX,k,j,i) = WProfile(thval, phival,timeshift )*VRProfile(thval, phival,timeshift );
-                        printf("            phydro->w(IVX,k,j,i) = %6.40lf \n", phydro->w(IVX,k,j,i));
-			phydro->w(IVY,k,j,i) = phydro->w1(IVY,k,j,i) = WProfile(thval, phival,timeshift )*VTProfile(thval, phival,timeshift );
-			printf("            phydro->w(IVY,k,j,i) = %6.40lf \n", phydro->w(IVY,k,j,i));
-			phydro->w(IVZ,k,j,i) = phydro->w1(IVZ,k,j,i) = WProfile(thval, phival,timeshift )*VPProfile(thval, phival,timeshift );
-                        printf("            phydro->w(IVZ,k,j,i) = %6.40lf \n", phydro->w(IVZ,k,j,i));	        	
-			phydro->w(IEN,k,j,i) = phydro->w1(IEN,k,j,i) = 0.0;//DenProfile(thval, phival,BCtin )*IntEnProfile(thval, phival,BCtin );
-                        printf("            phydro->w(IEN,k,j,i) = %6.40lf \n", phydro->w(IEN,k,j,i));
-			
-        	}
-		else{
-                        phydro->w(IVX,k,j,i) = phydro->w1(IVX,k,j,i) = VRProfile(thval, phival,BCtin );
-                        printf("            phydro->w(IVX,k,j,i) = %6.40lf \n", phydro->w(IVX,k,j,i));
-                        phydro->w(IVY,k,j,i) = phydro->w1(IVZ,k,j,i) = VTProfile(thval, phival,BCtin );
-                        printf("            phydro->w(IVY,k,j,i) = %6.40lf \n", phydro->w(IVY,k,j,i));
-                        phydro->w(IVZ,k,j,i) = phydro->w1(IVZ,k,j,i) = VPProfile(thval, phival,BCtin );
-                        printf("            phydro->w(IVZ,k,j,i) = %6.40lf \n", phydro->w(IVZ,k,j,i));
-                        phydro->w(IEN,k,j,i) = phydro->w1(IEN,k,j,i) = 0.0;// DenProfile(thval, phival,BCtin )*IntEnProfile(thval, phival,BCtin );
-                        printf("            phydro->w(IEN,k,j,i) = %6.40lf \n", phydro->w(IEN,k,j,i));
-		}
-
+ 
+	Real den  = da;
+        Real pres = pa;
+        phydro->u(IDN,k,j,i) = den;
+	phydro->u(IPR,k,j,i) = pres;
+	phydro->u(IM1,k,j,i) = 0.0;
+        phydro->u(IM2,k,j,i) = 0.0;
+        phydro->u(IM3,k,j,i) = 0.0;
+        phydro->u(IEN,k,j,i) = pres/gm1;
+        if (RELATIVISTIC_DYNAMICS){  // this should only ever be SR with this file
+          phydro->u(IEN,k,j,i) += den;
 	}
-	else{
-        	Real den  = 2.0*std::pow(10,-16);//1000.0 * da;
-        	Real pres = 3.0*std::pow(10,-16);//1000.0 * pa;
-        	phydro->w(IDN,k,j,i) = phydro->w1(IDN,k,j,i) = den;
-        	phydro->w(IPR,k,j,i) = phydro->w1(IPR,k,j,i) = pres;
-		//phydro->u(IM1,k,j,i) = 0.0;
-        	//phydro->u(IM2,k,j,i) = 0.0;
-        	//phydro->u(IM3,k,j,i) = 0.0;
-        	//phydro->u(IEN,k,j,i) = pres/gm1;
-        	//if (RELATIVISTIC_DYNAMICS){  // this should only ever be SR with this file
-          	//	phydro->w(IEN,k,j,i) += den;
-		//}
-       }
       }
     }
   }
-  peos->PrimitiveToConserved(phydro->w, b, phydro->u, pcoord, il, iu, jl, ju, kl, ku);
   // NOT TESTED FOR MAGNETIC FIELDS
   // initialize interface B and total energy
   if (MAGNETIC_FIELDS_ENABLED) {
@@ -530,22 +470,23 @@ void OutflowReader(const char *filename, InterpTable3D *table) {
                         for (int jj =0; jj <=BCNghts ; jj++){
 
                                 // Region 1 to Region 1' (phi <0)
-                                table->data(0 , BCNghts + ii, jj, kk ) = table->data(0 , BCNghts + ii, BCNphi + BCNghts - jj, kk ); //density 
-                                table->data(1 , BCNghts + ii, jj, kk ) = table->data(1 , BCNghts + ii, BCNphi + BCNghts - jj, kk ); //pressure
-                                table->data(2 , BCNghts + ii, jj, kk ) = table->data(2 , BCNghts + ii, BCNphi + BCNghts - jj, kk ); //vr
-                                table->data(3 , BCNghts + ii, jj, kk ) = table->data(3 , BCNghts + ii, BCNphi + BCNghts - jj, kk ); //vt
-                                table->data(4 , BCNghts + ii, jj, kk ) = table->data(4 , BCNghts + ii, BCNphi + BCNghts - jj, kk ); //vp
-                                table->data(5 , BCNghts + ii, jj, kk ) = table->data(5 , BCNghts + ii, BCNphi + BCNghts - jj, kk ); //inter    
-                                table->data(6 , BCNghts + ii, jj, kk ) = table->data(6 , BCNghts + ii, BCNphi + BCNghts - jj, kk ); //W    
+                                table->data(0 , BCNghts + ii, jj, kk ) = table->data(0 , BCNghts + ii, BCNphi + jj, kk ); //density 
+                                table->data(1 , BCNghts + ii, jj, kk ) = table->data(1 , BCNghts + ii, BCNphi + jj, kk ); //pressure
+                                table->data(2 , BCNghts + ii, jj, kk ) = table->data(2 , BCNghts + ii, BCNphi + jj, kk ); //vr
+                                table->data(3 , BCNghts + ii, jj, kk ) = table->data(3 , BCNghts + ii, BCNphi + jj, kk ); //vt
+                                table->data(4 , BCNghts + ii, jj, kk ) = table->data(4 , BCNghts + ii, BCNphi + jj, kk ); //vp
+                                table->data(5 , BCNghts + ii, jj, kk ) = table->data(5 , BCNghts + ii, BCNphi + jj, kk ); //inter    
+                                table->data(6 , BCNghts + ii, jj, kk ) = table->data(6 , BCNghts + ii, BCNphi + jj, kk ); //W    
+  
 
                                 // Region 5 to Region 5' (phi > 2pi)
-                                table->data(0 , BCNghts + ii, BCNphi + BCNghts + jj, kk ) = table->data(0 , BCNghts + ii, 2 * BCNghts - jj, kk ); //density 
-                                table->data(1 , BCNghts + ii, BCNphi + BCNghts + jj, kk ) = table->data(1 , BCNghts + ii, 2 * BCNghts - jj, kk ); //pressure
-                                table->data(2 , BCNghts + ii, BCNphi + BCNghts + jj, kk ) = table->data(2 , BCNghts + ii, 2 * BCNghts - jj, kk ); //vr
-                                table->data(3 , BCNghts + ii, BCNphi + BCNghts + jj, kk ) = table->data(3 , BCNghts + ii, 2 * BCNghts - jj, kk ); //vt
-                                table->data(4 , BCNghts + ii, BCNphi + BCNghts + jj, kk ) = table->data(4 , BCNghts + ii, 2 * BCNghts - jj, kk ); //vp
-                                table->data(5 , BCNghts + ii, BCNphi + BCNghts + jj, kk ) = table->data(5 , BCNghts + ii, 2 * BCNghts - jj, kk ); //inter
-                                table->data(6 , BCNghts + ii, BCNphi + BCNghts + jj, kk ) = table->data(6 , BCNghts + ii, 2 * BCNghts - jj, kk ); //W
+                                table->data(0 , BCNghts + ii, BCNphi + BCNghts + jj, kk ) = table->data(0 , BCNghts + ii, BCNghts + jj, kk ); //density 
+                                table->data(1 , BCNghts + ii, BCNphi + BCNghts + jj, kk ) = table->data(1 , BCNghts + ii, BCNghts + jj, kk ); //pressure
+                                table->data(2 , BCNghts + ii, BCNphi + BCNghts + jj, kk ) = table->data(2 , BCNghts + ii, BCNghts + jj, kk ); //vr
+                                table->data(3 , BCNghts + ii, BCNphi + BCNghts + jj, kk ) = table->data(3 , BCNghts + ii, BCNghts + jj, kk ); //vt
+                                table->data(4 , BCNghts + ii, BCNphi + BCNghts + jj, kk ) = table->data(4 , BCNghts + ii, BCNghts + jj, kk ); //vp
+                                table->data(5 , BCNghts + ii, BCNphi + BCNghts + jj, kk ) = table->data(5 , BCNghts + ii, BCNghts + jj, kk ); //inter
+                                table->data(6 , BCNghts + ii, BCNphi + BCNghts + jj, kk ) = table->data(6 , BCNghts + ii, BCNghts + jj, kk ); //W
 
                         }
                 }
@@ -554,23 +495,22 @@ void OutflowReader(const char *filename, InterpTable3D *table) {
                 for (int ii =0 ; ii<=BCNghts ; ii++){
                         for (int jj =0; jj <=BCNphi ; jj++){
                                 // Region 3 to Region 3' (theta <0)
-                                table->data(0 , BCNtheta + BCNghts + ii, BCNghts + jj, kk ) =   table->data(0 , 2 * BCNghts - ii, BCNghts + jj, kk ); //density
-                                table->data(1 , BCNtheta + BCNghts + ii, BCNghts + jj, kk ) =   table->data(1 , 2 * BCNghts - ii, BCNghts + jj, kk ); //pressure
-                                table->data(2 , BCNtheta + BCNghts + ii, BCNghts + jj, kk ) =   table->data(2 , 2 * BCNghts - ii, BCNghts + jj, kk ); //vr
-                                table->data(3 , BCNtheta + BCNghts + ii, BCNghts + jj, kk ) = - table->data(3 , 2 * BCNghts - ii, BCNghts + jj, kk ); //vt
-                                table->data(4 , BCNtheta + BCNghts + ii, BCNghts + jj, kk ) = + table->data(4 , 2 * BCNghts - ii, BCNghts + jj, kk ); //vp 
-                                table->data(5 , BCNtheta + BCNghts + ii, BCNghts + jj, kk ) =   table->data(5 , 2 * BCNghts - ii, BCNghts + jj, kk ); //inter  
-                                table->data(6 , BCNtheta + BCNghts + ii, BCNghts + jj, kk ) =   table->data(6 , 2 * BCNghts - ii, BCNghts + jj, kk ); //W  
+				table->data(0 , ii, BCNghts + jj, kk ) =   table->data(0 , BCNtheta + ii, BCNghts + jj, kk ); //density
+                                table->data(1 , ii, BCNghts + jj, kk ) =   table->data(1 , BCNtheta + ii, BCNghts + jj, kk ); //pressure
+                                table->data(2 , ii, BCNghts + jj, kk ) =   table->data(2 , BCNtheta + ii, BCNghts + jj, kk ); //vr
+                                table->data(3 , ii, BCNghts + jj, kk ) = - table->data(3 , BCNtheta + ii, BCNghts + jj, kk ); //vt
+                                table->data(4 , ii, BCNghts + jj, kk ) = + table->data(4 , BCNtheta + ii, BCNghts + jj, kk ); //vp 
+                                table->data(5 , ii, BCNghts + jj, kk ) =   table->data(5 , BCNtheta + ii, BCNghts + jj, kk ); //inter  
+                                table->data(6 , ii, BCNghts + jj, kk ) =   table->data(6 , BCNtheta + ii, BCNghts + jj, kk ); //W  
 
                                 // Region 7 to Region 7' (theta > pi)
-                                table->data(0 , ii, BCNghts + jj, kk ) =   table->data(0 , BCNtheta + BCNghts - ii, BCNghts + jj, kk ); //density
-                                table->data(1 , ii, BCNghts + jj, kk ) =   table->data(1 , BCNtheta + BCNghts - ii, BCNghts + jj, kk ); //pressure
-                                table->data(2 , ii, BCNghts + jj, kk ) =   table->data(2 , BCNtheta + BCNghts - ii, BCNghts + jj, kk ); //vr
-                                table->data(3 , ii, BCNghts + jj, kk ) = - table->data(3 , BCNtheta + BCNghts - ii, BCNghts + jj, kk ); //vt
-                                table->data(4 , ii, BCNghts + jj, kk ) = + table->data(4 , BCNtheta + BCNghts - ii, BCNghts + jj, kk ); //vp 
-                                table->data(5 , ii, BCNghts + jj, kk ) =   table->data(5 , BCNtheta + BCNghts - ii, BCNghts + jj, kk ); //inter
-                                table->data(6 , ii, BCNghts + jj, kk ) =   table->data(6 , BCNtheta + BCNghts - ii, BCNghts + jj, kk ); //W  
-
+                                table->data(0 , BCNtheta + BCNghts + ii, BCNghts + jj, kk ) =   table->data(0 , BCNghts + ii, BCNghts + jj, kk ); //density
+                                table->data(1 , BCNtheta + BCNghts + ii, BCNghts + jj, kk ) =   table->data(1 , BCNghts + ii, BCNghts + jj, kk ); //pressure
+                                table->data(2 , BCNtheta + BCNghts + ii, BCNghts + jj, kk ) =   table->data(2 , BCNghts + ii, BCNghts + jj, kk ); //vr
+                                table->data(3 , BCNtheta + BCNghts + ii, BCNghts + jj, kk ) = - table->data(3 , BCNghts + ii, BCNghts + jj, kk ); //vt
+                                table->data(4 , BCNtheta + BCNghts + ii, BCNghts + jj, kk ) = + table->data(4 , BCNghts + ii, BCNghts + jj, kk ); //vp 
+                                table->data(5 , BCNtheta + BCNghts + ii, BCNghts + jj, kk ) =   table->data(5 , BCNghts + ii, BCNghts + jj, kk ); //inter
+                                table->data(6 , BCNtheta + BCNghts + ii, BCNghts + jj, kk ) =   table->data(6 , BCNghts + ii, BCNghts + jj, kk ); //W 
                         }
                 }
         // filling in the corners of the ghost zones
@@ -584,8 +524,7 @@ void OutflowReader(const char *filename, InterpTable3D *table) {
                                 table->data(3 , BCNtheta + BCNghts + ii , jj , kk ) = table->data(3 , 2 * BCNghts - ii , BCNphi + BCNghts -jj , kk ); //vt
                                 table->data(4 , BCNtheta + BCNghts + ii , jj , kk ) = table->data(4 , 2 * BCNghts - ii , BCNphi + BCNghts -jj , kk ); //vp    
                                 table->data(5 , BCNtheta + BCNghts + ii , jj , kk ) = table->data(5 , 2 * BCNghts - ii , BCNphi + BCNghts -jj , kk ); //inter   
-                                table->data(6 , BCNtheta + BCNghts + ii , jj , kk ) = table->data(6 , 2 * BCNghts - ii , BCNphi + BCNghts -jj , kk ); //W                              
-
+                                table->data(6 , BCNtheta + BCNghts + ii , jj , kk ) = table->data(6 , 2 * BCNghts - ii , BCNphi + BCNghts -jj , kk ); //W 
 				// Region 4 to Region 4'
                                 table->data(0 , BCNtheta + BCNghts + ii, BCNphi + BCNghts + jj, kk ) = table->data(0 , 2 * BCNghts - ii, 2 * BCNghts - jj, kk ); //density 
                                 table->data(1 , BCNtheta + BCNghts + ii, BCNphi + BCNghts + jj, kk ) = table->data(1 , 2 * BCNghts - ii, 2 * BCNghts - jj, kk ); //pressure
@@ -594,8 +533,10 @@ void OutflowReader(const char *filename, InterpTable3D *table) {
                                 table->data(4 , BCNtheta + BCNghts + ii, BCNphi + BCNghts + jj, kk ) = table->data(4 , 2 * BCNghts - ii, 2 * BCNghts - jj, kk ); //vp  
                                 table->data(5 , BCNtheta + BCNghts + ii, BCNphi + BCNghts + jj, kk ) = table->data(5 , 2 * BCNghts - ii, 2 * BCNghts - jj, kk ); //inter  
                                 table->data(6 , BCNtheta + BCNghts + ii, BCNphi + BCNghts + jj, kk ) = table->data(6 , 2 * BCNghts - ii, 2 * BCNghts - jj, kk ); //W  
+
                          
                                 // Region 6 to Region 6'
+
                                 table->data(0 , ii, BCNphi + BCNghts + jj, kk ) = table->data(0 , BCNtheta + BCNghts - ii, 2 * BCNghts - jj, kk ); //density 
                                 table->data(1 , ii, BCNphi + BCNghts + jj, kk ) = table->data(1 , BCNtheta + BCNghts - ii, 2 * BCNghts - jj, kk ); //pressure
                                 table->data(2 , ii, BCNphi + BCNghts + jj, kk ) = table->data(2 , BCNtheta + BCNghts - ii, 2 * BCNghts - jj, kk ); //vr
@@ -703,14 +644,12 @@ Real WProfile(const Real th, const Real ph, const Real tm) {
 // LFLM implementation of the inner boundary condition start
 
 void InnerBoundary(MeshBlock *pmb, Coordinates *pcoord,
-                  AthenaArray<Real> &prim, //AthenaArray<Real> &cons,
+                  AthenaArray<Real> &prim,
                   FaceField &b, Real time, Real dt,
                   int il, int iu, int jl, int ju, int kl, int ku,
                   int ngh) {
 
         printf("Entering BC condition \n");
-
-        //AthenaArray<Real> B;
 
         float BCThetamaxval = BCThetamax + BCNghts*BCDtheta;
         float BCThetaminval = BCThetamin - BCNghts*BCDtheta;
@@ -733,7 +672,6 @@ void InnerBoundary(MeshBlock *pmb, Coordinates *pcoord,
 				//printf("phi   = %6.40lf \n",phival);
 
                                 float timeshift     = time   + BCtin;
-				printf("timeshift= %6.40lf \n", timeshift);
 				if (timeshift < BCTmax ){
 	                                if (thval > BCThetamaxval or thval < BCThetaminval){
 	                                        printf(" Theta outside of interpolation range  \n");
@@ -757,9 +695,8 @@ void InnerBoundary(MeshBlock *pmb, Coordinates *pcoord,
 	                                        return;
 	                                }
         	                        if (std::isfinite(DenProfile(thval, phival, timeshift)) == 1 ) {
-	                                        prim(IDN, k ,j ,il-i) =  DenProfile(thval, phival, timeshift);
-					//	printf(" prim(IDN, k ,j ,il-i)   = %6.40lf \n", prim(IDN, k ,j ,il-i));
-					//	printf("Density according to fit = %6.40lf \n",  DenProfile(thval, phival, timeshift));
+	                                        prim(IDN, k ,j ,il-i) = DenProfile(thval, phival, timeshift);
+						//printf("Density set to %6.40lf \n", prim(IDN, k ,j ,il-i));
                 	                }
                         	        else {
                                 	        printf("Error in setting density! \n");
@@ -784,16 +721,12 @@ void InnerBoundary(MeshBlock *pmb, Coordinates *pcoord,
 					}
                                 	if (std::isfinite(VRProfile(thval, phival, time + BCtin)) == 1 and std::isfinite(WProfile(thval, phival, time + BCtin))==1) {
         					if (RELATIVISTIC_DYNAMICS){
-							prim(IVX, k, j, il-i) =0.99;//std::min(0.9,0.6+ WProfile(thval, phival, timeshift)*VRProfile(thval, phival, timeshift)); 
-							//prim(IM1, k, j, il-i) = WProfile(thval, phival, timeshift)*DenProfile(thval, phival, timeshift) *VRProfile(thval, phival, timeshift);
-                                                       // printf("vr rel. \n");
-						//	printf("W                  = %6.40lf \n", WProfile(thval, phival, timeshift));
-                                                //        printf("vr                 = %6.40lf \n", VRProfile(thval, phival, timeshift));
-					//		printf("prim(IVX, k, j, il-i) = %6.40lf \n", prim(IVX, k, j, il-i));
-
+							prim(IVX, k, j, il-i) = 0.3+0.0*WProfile(thval, phival, timeshift)*VRProfile(thval, phival, timeshift); 
+                                                        printf("vr rel. \n");
+							//printf("W = %6.40lf \n", WProfile(thval, phival, timeshift));
 						}
-						else {	
-							prim(IVX, k, j, il-i) = VRProfile(thval, phival, timeshift);
+						else {						
+							prim(IVX, k, j, il-i) = 0.0*VRProfile(thval, phival, timeshift);
                                                         //printf("vr non rel. \n");
 						}
                                         	if (std::abs(prim(IVX, k, j, il-i)) >= 1.0 ) {
@@ -814,13 +747,11 @@ void InnerBoundary(MeshBlock *pmb, Coordinates *pcoord,
                                 	if (std::isfinite(VTProfile(thval, phival, timeshift)) == 1 and std::isfinite(WProfile(thval, phival, time + BCtin))==1) {
                                         	
                                                 if (RELATIVISTIC_DYNAMICS){
-                                                        prim(IVY, k, j, il-i) = WProfile(thval, phival, timeshift)*VTProfile(thval, phival, timeshift);
-                                                        //prim(IM2, k, j, il-i) = WProfile(thval, phival, timeshift)*DenProfile(thval, phival, timeshift)*VTProfile(thval, phival, timeshift);
- 
+                                                        prim(IVY, k, j, il-i) = 0.0*WProfile(thval, phival, timeshift)*VTProfile(thval, phival, timeshift); 
                                                 	//printf("vt rel. \n");
 						}
                                                 else {
-                                                        prim(IVY, k, j, il-i) = VTProfile(thval, phival, timeshift);
+                                                        prim(IVY, k, j, il-i) = 0.0*VTProfile(thval, phival, timeshift);
                                                         //printf("vt non rel. \n");
 
                                                 }
@@ -841,14 +772,12 @@ void InnerBoundary(MeshBlock *pmb, Coordinates *pcoord,
                                 	}
                                 	if (std::isfinite(VPProfile(thval, phival, timeshift)) == 1 and std::isfinite(WProfile(thval, phival, time + BCtin))==1) {
                                                 if (RELATIVISTIC_DYNAMICS){
-                                                        prim(IVZ, k, j, il-i) = WProfile(thval, phival, timeshift)*VPProfile(thval, phival, timeshift); 
-                                                        //prim(IM3, k, j, il-i) = WProfile(thval, phival, timeshift)*DenProfile(thval, phival, timeshift)*VPProfile(thval, phival, timeshift);
-
+                                                        prim(IVZ, k, j, il-i) = 0.0*WProfile(thval, phival, timeshift)*VPProfile(thval, phival, timeshift); 
                                                         //printf("vp rel. \n");
 
 						}
                                                 else {
-                                                        prim(IVZ, k, j, il-i) = VPProfile(thval, phival, timeshift);
+                                                        prim(IVZ, k, j, il-i) =0.0 * VPProfile(thval, phival, timeshift);
                                                         //printf("vp non rel. \n");
 						}
                                         	if (std::abs(prim(IVZ, k, j, il-i)) >= 1.0 ) {
@@ -885,7 +814,6 @@ void InnerBoundary(MeshBlock *pmb, Coordinates *pcoord,
                         }
                 }
         }
-        //pmb->peos->PrimitiveToConserved(prim, B, cons, pcoord, il, iu, jl, ju, kl, ku);
         return;
 }
 

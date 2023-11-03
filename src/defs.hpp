@@ -15,13 +15,13 @@
 
 // configure.py dict(definitions) string values:
 // problem generator
-#define PROBLEM_GENERATOR "blast_try5_BC_v9_2"
+#define PROBLEM_GENERATOR "blast_try5_BC_v9_3"
 
 // coordinate system
-#define COORDINATE_SYSTEM "spherical_polar"
+#define COORDINATE_SYSTEM "schwarzschild"
 
 // Riemann solver
-#define RIEMANN_SOLVER "hllc"
+#define RIEMANN_SOLVER "hlle"
 
 // configure.py dict(definitions) Boolean values:
 // Equation of state
@@ -52,7 +52,7 @@
 #define RELATIVISTIC_DYNAMICS 1
 
 // enable general relativity? default=0 (false)
-#define GENERAL_RELATIVITY 0
+#define GENERAL_RELATIVITY 1
 
 // enable GR frame transformations? default=0 (false)
 #define FRAME_TRANSFORMATIONS 0

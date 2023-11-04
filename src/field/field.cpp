@@ -42,7 +42,7 @@ Field::Field(MeshBlock *pmb, ParameterInput *pin) :
     coarse_b_(pmb->ncc3, pmb->ncc2, pmb->ncc1+1,
               (pmb->pmy_mesh->multilevel ? AthenaArray<Real>::DataStatus::allocated :
                AthenaArray<Real>::DataStatus::empty)),
-    fbvar(pmb, &b, coarse_b_, e, true),
+    fbvar(pmb, &b, coarse_b_, e),
     fdif(pmb, pin) {
   int ncells1 = pmb->ncells1, ncells2 = pmb->ncells2, ncells3 = pmb->ncells3;
   Mesh *pm = pmy_block->pmy_mesh;
@@ -60,7 +60,7 @@ Field::Field(MeshBlock *pmb, ParameterInput *pin) :
   }
 
   if (STS_ENABLED) {
-    std::string sts_integrator = pin->GetOrAddString("time", "sts_integrator", "rkl2");
+    std::string sts_integrator = pin->GetOrAddString("time", "sts_integrator", "rkl1");
     if (sts_integrator == "rkl2") {
       b0.x1f.NewAthenaArray( ncells3   , ncells2   ,(ncells1+1));
       b0.x2f.NewAthenaArray( ncells3   ,(ncells2+1), ncells1   );

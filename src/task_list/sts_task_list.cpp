@@ -920,20 +920,6 @@ TaskStatus SuperTimeStepTaskList::Primitives_STS(MeshBlock *pmb, int stage) {
       if (pbval->nblevel[2][1][1] != -1) ku -= 1;
       // for MHD, shrink buffer by 3
       // TODO(felker): add MHD loop limit calculation for 4th order W(U)
-      // Apply physical boundaries prior to 4th order W(U)
-      if (do_sts_hydro || do_sts_field) {
-        pmb->phydro->hbvar.SwapHydroQuantity(pmb->phydro->w, HydroBoundaryQuantity::prim);
-      }
-      if (do_sts_scalar) {
-        pmb->pscalars->sbvar.var_cc = &(pmb->pscalars->r);
-        if (pmb->pmy_mesh->multilevel) {
-          pmb->pscalars->sbvar.coarse_buf = &(pmb->pscalars->coarse_r_);
-        }
-      }
-      Real time = pmb->pmy_mesh->time;
-      if (pmb->pmy_mesh->sts_loc == TaskType::op_split_after) time += pmb->pmy_mesh->dt;
-      pbval->ApplyPhysicalBoundaries(time, 0.0, pbval->bvars_sts);
-      // Perform 4th order W(U)
       if (do_sts_hydro || do_sts_field) {
         pmb->peos->ConservedToPrimitiveCellAverage(ph->u, ph->w, pf->b,
                                                    ph->w, pf->bcc, pmb->pcoord,
@@ -960,9 +946,6 @@ TaskStatus SuperTimeStepTaskList::PhysicalBoundary_STS(MeshBlock *pmb, int stage
     }
     if (do_sts_scalar) {
       pmb->pscalars->sbvar.var_cc = &(pmb->pscalars->r);
-      if (pmb->pmy_mesh->multilevel) {
-        pmb->pscalars->sbvar.coarse_buf = &(pmb->pscalars->coarse_r_);
-      }
     }
     Real time = pmb->pmy_mesh->time;
     if (pmb->pmy_mesh->sts_loc == TaskType::op_split_after) time += pmb->pmy_mesh->dt;

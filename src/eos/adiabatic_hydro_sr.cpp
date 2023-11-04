@@ -327,11 +327,11 @@ bool ConservedToPrimitiveNormal(
     AthenaArray<Real> &prim, Real *p_gamma_lor) {
   // Parameters
   const int max_iterations = 15;
-  const Real tol = 1.0e-12;
-  const Real pgas_uniform_min = 1.0e-12;
-  const Real a_min = 1.0e-12;
-  const Real v_sq_max = 1.0 - 1.0e-12;
-  const Real rr_max = 1.0 - 1.0e-12;
+  const Real tol = 1.0e-32;
+  const Real pgas_uniform_min = 1.0e-32;
+  const Real a_min = 1.0e-32;
+  const Real v_sq_max = 1.0 - 1.0e-32;
+  const Real rr_max = 1.0 - 1.0e-32;
 
   // Extract conserved values
   const Real &dd = dd_vals(i);

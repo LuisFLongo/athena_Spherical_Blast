@@ -40,17 +40,12 @@
 
 //! constructor
 
-FaceCenteredBoundaryVariable::FaceCenteredBoundaryVariable(MeshBlock *pmb,
-            FaceField *var, FaceField &coarse_buf, EdgeField &var_flux, bool fflux)
-          : BoundaryVariable(pmb, fflux), var_fc(var), coarse_buf(coarse_buf),
-            e1(var_flux.x1e), e2(var_flux.x2e), e3(var_flux.x3e),
-            flip_across_pole_(flip_across_pole_field) {
+FaceCenteredBoundaryVariable::FaceCenteredBoundaryVariable(
+    MeshBlock *pmb, FaceField *var, FaceField &coarse_buf, EdgeField &var_flux)
+    : BoundaryVariable(pmb), var_fc(var), coarse_buf(coarse_buf), e1(var_flux.x1e),
+      e2(var_flux.x2e), e3(var_flux.x3e), flip_across_pole_(flip_across_pole_field) {
   // assuming Field, not generic FaceCenteredBoundaryVariable:
-  // flip_across_pole_ = flip_across_pole_field;
-
-  // KT: fflux is a flag and it is true (false) when flux correction is (not) needed.
-  //     I have not implemented it for FC because currently this is only used for
-  //     magnetic fields which always require flux (EMF) correction.
+  //flip_across_pole_ = flip_across_pole_field;
 
   InitBoundaryData(bd_var_, BoundaryQuantity::fc);
   InitBoundaryData(bd_var_flcor_, BoundaryQuantity::fc_flcor);
@@ -1447,8 +1442,8 @@ void FaceCenteredBoundaryVariable::StartReceiving(BoundaryCommSubset phase) {
     if (phase == BoundaryCommSubset::all) {
       for (int upper=0; upper<2; upper++) {
         if (pbval_->is_shear[upper]) {
-          int *counts1 = pbval_->sb_flux_data_[upper].send_count;
-          int *counts2 = pbval_->sb_flux_data_[upper].recv_count;
+          int *counts1 = pbval_->shear_flux_send_count_[upper];
+          int *counts2 = pbval_->shear_flux_recv_count_[upper];
           for (int n=0; n<3; n++) {
             if (counts1[n]>0) {
               shear_send_count_emf_[upper][n] = counts1[n]*(nx3+1)
@@ -1472,8 +1467,8 @@ void FaceCenteredBoundaryVariable::StartReceiving(BoundaryCommSubset phase) {
     }
     for (int upper=0; upper<2; upper++) {
       if (pbval_->is_shear[upper]) {
-        int *counts1 = pbval_->sb_data_[upper].send_count;
-        int *counts2 = pbval_->sb_data_[upper].recv_count;
+        int *counts1 = pbval_->shear_send_count_[upper];
+        int *counts2 = pbval_->shear_recv_count_[upper];
         for (int n=0; n<4; n++) {
           if (counts1[n]>0) {
             shear_send_count_fc_[upper][n] = NGHOST*(counts1[n]*(nc3+1)
@@ -1543,11 +1538,10 @@ void FaceCenteredBoundaryVariable::ClearBoundary(BoundaryCommSubset phase) {
       for (int upper=0; upper<2; upper++) {
         if (pbval_->is_shear[upper]) {
           for (int n=0; n<3; n++) {
-            if (pbval_->sb_flux_data_[upper].send_neighbor[n].rank == -1) continue;
+            if (pbval_->shear_flux_send_neighbor_[upper][n].rank == -1) continue;
             shear_bd_flux_[upper].flag[n] = BoundaryStatus::waiting;
 #ifdef MPI_PARALLEL
-            if (pbval_->sb_flux_data_[upper].send_neighbor[n].rank
-                                                                   != Globals::my_rank) {
+            if (pbval_->shear_flux_send_neighbor_[upper][n].rank != Globals::my_rank) {
               MPI_Wait(&shear_bd_flux_[upper].req_send[n], MPI_STATUS_IGNORE);
             }
 #endif
@@ -1558,10 +1552,10 @@ void FaceCenteredBoundaryVariable::ClearBoundary(BoundaryCommSubset phase) {
     for (int upper=0; upper<2; upper++) {
       if (pbval_->is_shear[upper]) {
         for (int n=0; n<4; n++) {
-          if (pbval_->sb_data_[upper].send_neighbor[n].rank == -1) continue;
+          if (pbval_->shear_send_neighbor_[upper][n].rank == -1) continue;
           shear_bd_var_[upper].flag[n] = BoundaryStatus::waiting;
 #ifdef MPI_PARALLEL
-          if (pbval_->sb_data_[upper].send_neighbor[n].rank != Globals::my_rank) {
+          if (pbval_->shear_send_neighbor_[upper][n].rank != Globals::my_rank) {
             MPI_Wait(&shear_bd_var_[upper].req_send[n], MPI_STATUS_IGNORE);
           }
 #endif

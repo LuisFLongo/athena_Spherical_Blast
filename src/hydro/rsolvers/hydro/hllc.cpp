@@ -46,8 +46,8 @@ void Hydro::RiemannSolver(const int k, const int j, const int il, const int iu,
   Real gm1 = gamma - 1.0;
   Real igm1 = 1.0/gm1;
 
-#pragma omp simd private(wli,wri,flxi,fl,fr)
 #pragma distribute_point
+#pragma omp simd private(wli,wri,flxi,fl,fr)
   for (int i=il; i<=iu; ++i) {
     //--- Step 1.  Load L/R states into local variables
     wli[IDN]=wl(IDN,i);
@@ -105,8 +105,8 @@ void Hydro::RiemannSolver(const int k, const int j, const int il, const int iu,
     al = wli[IVX] - cl*ql;
     ar = wri[IVX] + cr*qr;
 
-    Real bp = ar > 0.0 ? ar : (TINY_NUMBER);
-    Real bm = al < 0.0 ? al : -(TINY_NUMBER);
+    Real bp = ar > 0.0 ? ar : 0.0;
+    Real bm = al < 0.0 ? al : 0.0;
 
     //--- Step 5. Compute the contact wave speed and pressure
 

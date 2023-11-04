@@ -81,8 +81,7 @@ enum BoundaryFace {undef=-1, inner_x1=0, outer_x1=1, inner_x2=2, outer_x2=3,
 
 //! identifiers for boundary conditions
 enum class BoundaryFlag {block=-1, undef, reflect, outflow, user, periodic,
-                         polar, polar_wedge, shear_periodic,
-                         mg_zerograd, mg_zerofixed, mg_multipole};
+                         polar, polar_wedge, shear_periodic};
 
 //! identifiers for types of neighbor blocks (connectivity with current MeshBlock)
 enum class NeighborConnect {none, face, edge, corner}; // degenerate/shared part of block
@@ -175,19 +174,6 @@ struct BoundaryData { // aggregate and POD (even when MPI_PARALLEL is defined)
 
 using ShearingBoundaryData = BoundaryData<4>;
 using ShearingFluxBoundaryData = BoundaryData<3>;
-
-//----------------------------------------------------------------------------------------
-//! \struct ShearNeighborData
-//! \brief structure storing shearing boundary information
-
-template <int n = 4>
-struct ShearNeighborData {
-  static constexpr int kMaxNeighbor = n;
-  SimpleNeighborBlock send_neighbor[kMaxNeighbor], recv_neighbor[kMaxNeighbor];
-  int send_count[kMaxNeighbor], recv_count[kMaxNeighbor];
-  int jmin_send[kMaxNeighbor], jmax_send[kMaxNeighbor];
-  int jmin_recv[kMaxNeighbor], jmax_recv[kMaxNeighbor];
-};
 
 // Struct for describing blocks which touch the shearing-periodic boundaries
 // struct ShearingBoundaryBlock {
@@ -316,7 +302,7 @@ class BoundaryPhysics {
 class BoundaryVariable : public BoundaryCommunication, public BoundaryBuffer,
                          public BoundaryPhysics {
  public:
-  explicit BoundaryVariable(MeshBlock *pmb, bool fflux);
+  explicit BoundaryVariable(MeshBlock *pmb);
   virtual ~BoundaryVariable() = default;
 
   // (usuallly the std::size_t unsigned integer type)
@@ -342,7 +328,6 @@ class BoundaryVariable : public BoundaryCommunication, public BoundaryBuffer,
   Mesh *pmy_mesh_;
   BoundaryValues *pbval_;  // ptr to BoundaryValues that aggregates these
                            // BoundaryVariable objects
-  bool fflux_;
 
   void CopyVariableBufferSameProcess(NeighborBlock& nb, int ssize);
   void CopyFluxCorrectionBufferSameProcess(NeighborBlock& nb, int ssize);

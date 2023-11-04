@@ -14,18 +14,16 @@
 #include "../athena.hpp"
 #include "../athena_arrays.hpp"
 #include "../defs.hpp"
-#include "multigrid.hpp"
-
 
 //----------------------------------------------------------------------------------------
-//! \fn void::MGZeroGradientInnerX1(AthenaArray<Real> &dst, Real time,
-//                  int nvar, int is, int ie, int js, int je, int ks, int ke, int ngh,
-//                  const MGCoordinates &coord)
+//! \fn MGZeroGradientInnerX1(AthenaArray<Real> &dst, Real time, int nvar,
+//                            int is, int ie, int js, int je, int ks, int ke, int ngh,
+//                            Real x0, Real y0, Real z0, Real dx, Real dy, Real dz)
 //  \brief Zero gradient boundary condition in the inner-X1 direction
 
 void MGZeroGradientInnerX1(AthenaArray<Real> &dst, Real time, int nvar,
                            int is, int ie, int js, int je, int ks, int ke, int ngh,
-                           const MGCoordinates &coord) {
+                           Real x0, Real y0, Real z0, Real dx, Real dy, Real dz) {
   for (int n=0; n<nvar; n++) {
     for (int k=ks; k<=ke; k++) {
       for (int j=js; j<=je; j++) {
@@ -39,14 +37,14 @@ void MGZeroGradientInnerX1(AthenaArray<Real> &dst, Real time, int nvar,
 
 
 //----------------------------------------------------------------------------------------
-//! \fn void::MGZeroGradientOuterX1(AthenaArray<Real> &dst, Real time,
-//                  int nvar, int is, int ie, int js, int je, int ks, int ke, int ngh,
-//                  const MGCoordinates &coord)
+//! \fn MGZeroGradientOuterX1(AthenaArray<Real> &dst, Real time, int nvar,
+//                            int is, int ie, int js, int je, int ks, int ke, int ngh,
+//                            Real x0, Real y0, Real z0, Real dx, Real dy, Real dz)
 //  \brief Zero gradient boundary condition in the outer-X1 direction
 
 void MGZeroGradientOuterX1(AthenaArray<Real> &dst, Real time, int nvar,
                            int is, int ie, int js, int je, int ks, int ke, int ngh,
-                           const MGCoordinates &coord) {
+                           Real x0, Real y0, Real z0, Real dx, Real dy, Real dz) {
   for (int n=0; n<nvar; n++) {
     for (int k=ks; k<=ke; k++) {
       for (int j=js; j<=je; j++) {
@@ -60,14 +58,14 @@ void MGZeroGradientOuterX1(AthenaArray<Real> &dst, Real time, int nvar,
 
 
 //----------------------------------------------------------------------------------------
-//! \fn void::MGZeroGradientInnerX2(AthenaArray<Real> &dst, Real time,
-//                  int nvar, int is, int ie, int js, int je, int ks, int ke, int ngh,
-//                  const MGCoordinates &coord)
+//! \fn MGZeroGradientInnerX2(AthenaArray<Real> &dst, Real time, int nvar,
+//                            int is, int ie, int js, int je, int ks, int ke, int ngh,
+//                            Real x0, Real y0, Real z0, Real dx, Real dy, Real dz)
 //  \brief Zero gradient boundary condition in the inner-X2 direction
 
 void MGZeroGradientInnerX2(AthenaArray<Real> &dst, Real time, int nvar,
                            int is, int ie, int js, int je, int ks, int ke, int ngh,
-                           const MGCoordinates &coord) {
+                           Real x0, Real y0, Real z0, Real dx, Real dy, Real dz) {
   for (int n=0; n<nvar; n++) {
     for (int k=ks; k<=ke; k++) {
       for (int j=0; j<ngh; j++) {
@@ -81,14 +79,14 @@ void MGZeroGradientInnerX2(AthenaArray<Real> &dst, Real time, int nvar,
 
 
 //----------------------------------------------------------------------------------------
-//! \fn void::MGZeroGradientOuterX2(AthenaArray<Real> &dst, Real time,
-//                  int nvar, int is, int ie, int js, int je, int ks, int ke, int ngh,
-//                  const MGCoordinates &coord)
+//! \fn MGZeroGradientOuterX2(AthenaArray<Real> &dst, Real time, int nvar,
+//                            int is, int ie, int js, int je, int ks, int ke, int ngh,
+//                            Real x0, Real y0, Real z0, Real dx, Real dy, Real dz)
 //  \brief Zero gradient boundary condition in the outer-X2 direction
 
 void MGZeroGradientOuterX2(AthenaArray<Real> &dst, Real time, int nvar,
                            int is, int ie, int js, int je, int ks, int ke, int ngh,
-                           const MGCoordinates &coord) {
+                           Real x0, Real y0, Real z0, Real dx, Real dy, Real dz) {
   for (int n=0; n<nvar; n++) {
     for (int k=ks; k<=ke; k++) {
       for (int j=0; j<ngh; j++) {
@@ -102,14 +100,14 @@ void MGZeroGradientOuterX2(AthenaArray<Real> &dst, Real time, int nvar,
 
 
 //----------------------------------------------------------------------------------------
-//! \fn void::MGZeroGradientInnerX3(AthenaArray<Real> &dst, Real time,
-//                  int nvar, int is, int ie, int js, int je, int ks, int ke, int ngh,
-//                  const MGCoordinates &coord)
+//! \fn MGZeroGradientInnerX3(AthenaArray<Real> &dst, Real time, int nvar,
+//                            int is, int ie, int js, int je, int ks, int ke, int ngh,
+//                            Real x0, Real y0, Real z0, Real dx, Real dy, Real dz)
 //  \brief Zero gradient boundary condition in the inner-X3 direction
 
 void MGZeroGradientInnerX3(AthenaArray<Real> &dst, Real time, int nvar,
                            int is, int ie, int js, int je, int ks, int ke, int ngh,
-                           const MGCoordinates &coord) {
+                           Real x0, Real y0, Real z0, Real dx, Real dy, Real dz) {
   for (int n=0; n<nvar; n++) {
     for (int k=0; k<ngh; k++) {
       for (int j=js; j<=je; j++) {
@@ -123,14 +121,14 @@ void MGZeroGradientInnerX3(AthenaArray<Real> &dst, Real time, int nvar,
 
 
 //----------------------------------------------------------------------------------------
-//! \fn void::MGZeroGradientOuterX3(AthenaArray<Real> &dst, Real time,
-//                  int nvar, int is, int ie, int js, int je, int ks, int ke, int ngh,
-//                  const MGCoordinates &coord)
+//! \fn MGZeroGradientOuterX3(AthenaArray<Real> &dst, Real time, int nvar,
+//                            int is, int ie, int js, int je, int ks, int ke, int ngh,
+//                            Real x0, Real y0, Real z0, Real dx, Real dy, Real dz)
 //  \brief Zero gradient boundary condition in the outer-X3 direction
 
 void MGZeroGradientOuterX3(AthenaArray<Real> &dst, Real time, int nvar,
                            int is, int ie, int js, int je, int ks, int ke, int ngh,
-                           const MGCoordinates &coord) {
+                           Real x0, Real y0, Real z0, Real dx, Real dy, Real dz) {
   for (int n=0; n<nvar; n++) {
     for (int k=0; k<ngh; k++) {
       for (int j=js; j<=je; j++) {

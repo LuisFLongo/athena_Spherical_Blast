@@ -42,7 +42,7 @@ PassiveScalars::PassiveScalars(MeshBlock *pmb, ParameterInput *pin)  :
     coarse_r_(NSCALARS, pmb->ncc3, pmb->ncc2, pmb->ncc1,
               (pmb->pmy_mesh->multilevel ? AthenaArray<Real>::DataStatus::allocated :
                AthenaArray<Real>::DataStatus::empty)),
-    sbvar(pmb, &s, &coarse_s_, s_flux, true),
+    sbvar(pmb, &s, &coarse_s_, s_flux),
     nu_scalar_iso{pin->GetOrAddReal("problem", "nu_scalar_iso", 0.0)},
     //nu_scalar_aniso{pin->GetOrAddReal("problem", "nu_scalar_aniso", 0.0)},
     scalar_diffusion_defined{(nu_scalar_iso > 0.0 ? true : false)},
@@ -67,7 +67,7 @@ PassiveScalars::PassiveScalars(MeshBlock *pmb, ParameterInput *pin)  :
 
   // If STS RKL2, allocate additional memory registers
   if (STS_ENABLED) {
-    std::string sts_integrator = pin->GetOrAddString("time", "sts_integrator", "rkl2");
+    std::string sts_integrator = pin->GetOrAddString("time", "sts_integrator", "rkl1");
     if (sts_integrator == "rkl2") {
       s0.NewAthenaArray(NSCALARS, nc3, nc2, nc1);
       s_fl_div.NewAthenaArray(NSCALARS, nc3, nc2, nc1);

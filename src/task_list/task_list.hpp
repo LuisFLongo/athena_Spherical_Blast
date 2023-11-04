@@ -22,20 +22,15 @@
 class Mesh;
 class MeshBlock;
 class TaskList;
+class FFTGravitySolverTaskList;
 class TaskID;
 
 //! \todo (felker):
 //! - these 4x declarations can be nested in TaskList if MGTaskList is derived
 
 // constants = return codes for functions working on individual Tasks and TaskList
-enum class TaskListStatus {running, stuck, complete, nothing_to_do};
 enum class TaskStatus {fail, success, next};
-// success vs. next: They are different (only) when there are more than one MeshBlock per
-// node.  When a task returns “next”, then the code processes the next Task in the same
-// MeshBlock; when it returns “success”, then the TaskList processes the next MeshBlock.
-// “next” should be used when you want to immediately start the next task, for example,
-// start sending the data just calculated in the previous task.  Otherwise, use “success”
-// to process MeshBlocks as evenly as possible.
+enum class TaskListStatus {running, stuck, complete, nothing_to_do};
 
 //----------------------------------------------------------------------------------------
 //! \class TaskID
@@ -156,7 +151,7 @@ class TimeIntegratorTaskList : public TaskList {
   TaskStatus IntegrateHydro(MeshBlock *pmb, int stage);
   TaskStatus IntegrateField(MeshBlock *pmb, int stage);
 
-  TaskStatus AddSourceTerms(MeshBlock *pmb, int stage);
+  TaskStatus AddSourceTermsHydro(MeshBlock *pmb, int stage);
 
   TaskStatus DiffuseHydro(MeshBlock *pmb, int stage);
   TaskStatus DiffuseField(MeshBlock *pmb, int stage);
@@ -284,7 +279,7 @@ const TaskID RECV_FLDFLX(11);
 // const TaskID RECV_RADFLX(12);
 // const TaskID RECV_CHMFLX(13);
 
-const TaskID SRC_TERM(14);
+const TaskID SRCTERM_HYD(14);
 // const TaskID SRCTERM_FLD(15);
 // const TaskID SRCTERM_RAD(16);
 // const TaskID SRCTERM_CHM(17);

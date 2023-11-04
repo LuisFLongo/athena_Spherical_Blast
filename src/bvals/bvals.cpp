@@ -58,7 +58,12 @@
 BoundaryValues::BoundaryValues(MeshBlock *pmb, BoundaryFlag *input_bcs,
                                ParameterInput *pin)
     : BoundaryBase(pmb->pmy_mesh, pmb->loc, pmb->block_size, input_bcs), pmy_block_(pmb),
-      sb_data_{}, sb_flux_data_{} {
+      shear_send_neighbor_{}, shear_recv_neighbor_{},
+      shear_send_count_{}, shear_recv_count_{},
+      jmin_send_{}, jmax_send_{}, jmin_recv_{}, jmax_recv_{},
+      shear_flux_send_neighbor_{}, shear_flux_recv_neighbor_{},
+      shear_flux_send_count_{}, shear_flux_recv_count_{},
+      jmin_flux_send_{}, jmax_flux_send_{}, jmin_flux_recv_{}, jmax_flux_recv_{} {
   // Check BC functions for each of the 6 boundaries in turn ---------------------
   for (int i=0; i<6; i++) {
     switch (block_bcs[i]) {
@@ -213,13 +218,6 @@ BoundaryValues::BoundaryValues(MeshBlock *pmb, BoundaryFlag *input_bcs,
     loc_shear[1] = pmy_mesh_->nrbx1*(1L << level) - 1;
 
     if (shearing_box == 1) {
-      if (NGHOST+xgh_ > pmb->block_size.nx2) {
-        std::stringstream msg;
-        msg << "### FATAL ERROR in BoundaryValues Class."<<std::endl
-            << "x2 block_size must be larger than NGHOST + "<< xgh_
-            << " = "<< NGHOST+xgh_ << "with shear_periodic boundary."<<std::endl;
-        ATHENA_ERROR(msg);
-      }
       int pnum = pmb->block_size.nx2+2*NGHOST+1;
       if (MAGNETIC_FIELDS_ENABLED) pnum++;
       pflux_.NewAthenaArray(pnum);
@@ -310,9 +308,7 @@ void BoundaryValues::SetupPersistentMPI() {
         }
       }
     }
-    qomL_ = pmb->porb->OrbitalVelocity(pmb->porb,pmy_mesh_->mesh_size.x1min,0,0)
-              - pmb->porb->OrbitalVelocity(pmb->porb,pmy_mesh_->mesh_size.x1max,0,0);
-  }
+  } // end KGF: exclusive shearing box portion of SetupPersistentMPI()
   return;
 }
 
@@ -353,26 +349,54 @@ void BoundaryValues::StartReceivingSubset(BoundaryCommSubset phase,
   // KGF: begin shearing-box exclusive section of original StartReceivingForInit()
   // find send_block_id and recv_block_id;
   if (shearing_box != 0) {
-    switch (phase) {
-      case BoundaryCommSubset::mesh_init:
-        break;
-      case BoundaryCommSubset::all:
-      case BoundaryCommSubset::orbital:
-        for (auto bvars_it = bvars_subset.begin(); bvars_it != bvars_subset.end();
-             ++bvars_it) {
-          (*bvars_it)->StartReceivingShear(phase);
-        }
-        break;
-      case BoundaryCommSubset::gr_amr:
-        // shearing box is currently incompatible with both GR and AMR
-        std::stringstream msg;
-        msg << "### FATAL ERROR in BoundaryValues::StartReceiving" << std::endl
-            << "BoundaryCommSubset::gr_amr was passed as the 'phase' argument while\n"
-            << "SHEARING_BOX=1 is enabled. Shearing box calculations are currently\n"
-            << "incompatible with both AMR and GR" << std::endl;
-        ATHENA_ERROR(msg);
-        break;
-    }
+    StartReceivingShear(phase);
+  }
+  return;
+}
+
+//----------------------------------------------------------------------------------------
+//! \fn void BoundaryValues::StartReceivingShear(BoundaryCommSubset phase)
+//! \brief initiate MPI_Irecv() for shearing box
+//!
+//! \note
+//! - cannot simply combine StartReceivingShear() at end of StartReceiving()
+//!   (which is done for ClearBoundary), because the "shared"/non-virtual fn
+//!   BoundaryValues::FindShearBlock() must be called in between 2x fns
+//! - shearing box is currently incompatible with both GR and AMR
+void BoundaryValues::StartReceivingShear(BoundaryCommSubset phase) {
+  switch (phase) {
+    case BoundaryCommSubset::mesh_init:
+      //FindShearBlock(pmy_mesh_->time);
+      break;
+    case BoundaryCommSubset::all:
+      // KGF: must pass "time" parameter from time_integrator.cpp
+      //FindShearBlock(time);
+
+      // KGF: cannot simply combine StartReceivingShear() at end of StartReceiving()
+      // (which is done for ClearBoundary), because the "shared"/non-virtual fn
+      // BoundaryValues::FindShearBlock() must be called in between 2x fns
+
+      //! \todo (felker):
+      //! * consider calling FindShearBlock() at the beginning of this fn,
+      //!   which will allow the 2x StartReceiving() to be combined
+      for (auto bvar : bvars_main_int) {
+        bvar->StartReceivingShear(phase);
+      }
+      break;
+    case BoundaryCommSubset::orbital:
+      for (auto bvar : bvars_main_int) {
+        bvar->StartReceivingShear(phase);
+      }
+      break;
+    case BoundaryCommSubset::gr_amr:
+      // shearing box is currently incompatible with both GR and AMR
+      std::stringstream msg;
+      msg << "### FATAL ERROR in BoundaryValues::StartReceiving" << std::endl
+          << "BoundaryCommSubset::gr_amr was passed as the 'phase' argument while\n"
+          << "SHEARING_BOX=1 is enabled. Shearing box calculations are currently\n"
+          << "incompatible with both AMR and GR" << std::endl;
+      ATHENA_ERROR(msg);
+      break;
   }
   return;
 }
@@ -696,12 +720,17 @@ void BoundaryValues::ComputeShear(const Real time_fc, const Real time_int) {
   MeshBlock *pmb = pmy_block_;
   Coordinates *pco = pmb->pcoord;
   Mesh *pmesh = pmb->pmy_mesh;
-
+  OrbitalAdvection *porb = pmb->porb;
+  qomL_ = porb->OrbitalVelocity(porb,pmy_mesh_->mesh_size.x1min,0,0)
+            - porb->OrbitalVelocity(porb,pmy_mesh_->mesh_size.x1max,0,0);
   if (shearing_box == 1) {
     int nx2 = pmb->block_size.nx2;
     int js = pmb->js; int je = pmb->je;
     int jl = js-NGHOST; int ju = je+NGHOST;
+
     int level = pmb->loc.level - pmesh->root_level;
+    // TODO(felker): share nblx2 with ctor?
+    std::int64_t nblx2 = pmesh->nrbx2*(1L << level);
 
     // Update the amount of shear:
     Real x2size = pmesh->mesh_size.x2max - pmesh->mesh_size.x2min;
@@ -717,16 +746,19 @@ void BoundaryValues::ComputeShear(const Real time_fc, const Real time_int) {
     joverlap_flux_   = joffset - Ngrids*nx2;
     eps_flux_ = (std::fmod(deltay, dx))/dx;
 
+    // shear_flux_send_neighbor_[][], shear_flux_recv_neighbor_[][]
+    // shear_flux_send_count_*_ / shear_flux_recv_count_*_
+    // jmin_flux_send_, jmax_flux_send_, jmin_flux_recv_, jmax_flux_recv_
     for (int upper=0; upper<2; upper++) {
       if (is_shear[upper]) {
-        int *counts1 = sb_flux_data_[upper].send_count;
-        int *counts2 = sb_flux_data_[upper].recv_count;
-        SimpleNeighborBlock *nb1 = sb_flux_data_[upper].send_neighbor;
-        SimpleNeighborBlock *nb2 = sb_flux_data_[upper].recv_neighbor;
-        int *jmin1 = sb_flux_data_[upper].jmin_send;
-        int *jmax1 = sb_flux_data_[upper].jmax_send;
-        int *jmin2 = sb_flux_data_[upper].jmin_recv;
-        int *jmax2 = sb_flux_data_[upper].jmax_recv;
+        int *counts1 = shear_flux_send_count_[upper];
+        int *counts2 = shear_flux_recv_count_[upper];
+        SimpleNeighborBlock *nb1 = shear_flux_send_neighbor_[upper];
+        SimpleNeighborBlock *nb2 = shear_flux_recv_neighbor_[upper];
+        int *jmin1 = jmin_flux_send_[upper];
+        int *jmax1 = jmax_flux_send_[upper];
+        int *jmin2 = jmin_flux_recv_[upper];
+        int *jmax2 = jmax_flux_recv_[upper];
         int jo     = (1-2*upper)*((1-upper)+joverlap_flux_);
         int Ng     = (1-2*upper)*Ngrids;
 
@@ -808,23 +840,26 @@ void BoundaryValues::ComputeShear(const Real time_fc, const Real time_int) {
       }
     } // end loop over inner, outer shearing boundaries
 
-    // after integration
+    // integration
     yshear = qomL_*time_int;
     deltay = std::fmod(yshear, x2size);
     joffset = static_cast<int>(deltay/dx); // assumes uniform grid in azimuth
     Ngrids  = static_cast<int>(joffset/nx2);
     joverlap_   = joffset - Ngrids*nx2;
     eps_ = (std::fmod(deltay, dx))/dx;
+    // shear_send_neighbor_[][], shear_recv_neighbor_[][]
+    // shear_send_count_*_ / shear_recv_count_*_
+    // jmin_send_, jmax_send_, jmin_recv_, jmax_recv_
     for (int upper=0; upper<2; upper++) {
       if (is_shear[upper]) {
-        int *counts1 = sb_data_[upper].send_count;
-        int *counts2 = sb_data_[upper].recv_count;
-        SimpleNeighborBlock *nb1 = sb_data_[upper].send_neighbor;
-        SimpleNeighborBlock *nb2 = sb_data_[upper].recv_neighbor;
-        int *jmin1 = sb_data_[upper].jmin_send;
-        int *jmax1 = sb_data_[upper].jmax_send;
-        int *jmin2 = sb_data_[upper].jmin_recv;
-        int *jmax2 = sb_data_[upper].jmax_recv;
+        int *counts1 = shear_send_count_[upper];
+        int *counts2 = shear_recv_count_[upper];
+        SimpleNeighborBlock *nb1 = shear_send_neighbor_[upper];
+        SimpleNeighborBlock *nb2 = shear_recv_neighbor_[upper];
+        int *jmin1 = jmin_send_[upper];
+        int *jmax1 = jmax_send_[upper];
+        int *jmin2 = jmin_recv_[upper];
+        int *jmax2 = jmax_recv_[upper];
         int jo     = (1-2*upper)*((1-upper)+joverlap_);
         int Ng     = (1-2*upper)*Ngrids;
 

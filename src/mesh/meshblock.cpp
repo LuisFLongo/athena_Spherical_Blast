@@ -45,9 +45,10 @@
 //!                        and mesh refinement objects.
 
 MeshBlock::MeshBlock(int igid, int ilid, LogicalLocation iloc, RegionSize input_block,
-           BoundaryFlag *input_bcs, Mesh *pm, ParameterInput *pin, bool ref_flag) :
+                     BoundaryFlag *input_bcs, Mesh *pm, ParameterInput *pin,
+                     int igflag, bool ref_flag) :
     pmy_mesh(pm), loc(iloc), block_size(input_block),
-    gid(igid), lid(ilid), nuser_out_var(),
+    gid(igid), lid(ilid), gflag(igflag), nuser_out_var(),
     new_block_dt_{}, new_block_dt_hyperbolic_{}, new_block_dt_parabolic_{},
     new_block_dt_user_{},
     nreal_user_meshblock_data_(), nint_user_meshblock_data_(), cost_(1.0) {
@@ -189,9 +190,10 @@ MeshBlock::MeshBlock(int igid, int ilid, LogicalLocation iloc, RegionSize input_
 
 MeshBlock::MeshBlock(int igid, int ilid, Mesh *pm, ParameterInput *pin,
                      LogicalLocation iloc, RegionSize input_block,
-                     BoundaryFlag *input_bcs, double icost, char *mbdata) :
+                     BoundaryFlag *input_bcs,
+                     double icost, char *mbdata, int igflag) :
     pmy_mesh(pm), loc(iloc), block_size(input_block),
-    gid(igid), lid(ilid), nuser_out_var(),
+    gid(igid), lid(ilid), gflag(igflag), nuser_out_var(),
     new_block_dt_{}, new_block_dt_hyperbolic_{}, new_block_dt_parabolic_{},
     new_block_dt_user_{},
     nreal_user_meshblock_data_(), nint_user_meshblock_data_(), cost_(icost) {
@@ -302,6 +304,8 @@ MeshBlock::MeshBlock(int igid, int ilid, Mesh *pm, ParameterInput *pin,
 
   // load hydro and field data
   std::memcpy(phydro->u.data(), &(mbdata[os]), phydro->u.GetSizeInBytes());
+  // load it into the other memory register(s) too
+  std::memcpy(phydro->u1.data(), &(mbdata[os]), phydro->u1.GetSizeInBytes());
   os += phydro->u.GetSizeInBytes();
   if (GENERAL_RELATIVITY) {
     std::memcpy(phydro->w.data(), &(mbdata[os]), phydro->w.GetSizeInBytes());
@@ -311,16 +315,21 @@ MeshBlock::MeshBlock(int igid, int ilid, Mesh *pm, ParameterInput *pin,
   }
   if (MAGNETIC_FIELDS_ENABLED) {
     std::memcpy(pfield->b.x1f.data(), &(mbdata[os]), pfield->b.x1f.GetSizeInBytes());
+    std::memcpy(pfield->b1.x1f.data(), &(mbdata[os]), pfield->b1.x1f.GetSizeInBytes());
     os += pfield->b.x1f.GetSizeInBytes();
     std::memcpy(pfield->b.x2f.data(), &(mbdata[os]), pfield->b.x2f.GetSizeInBytes());
+    std::memcpy(pfield->b1.x2f.data(), &(mbdata[os]), pfield->b1.x2f.GetSizeInBytes());
     os += pfield->b.x2f.GetSizeInBytes();
     std::memcpy(pfield->b.x3f.data(), &(mbdata[os]), pfield->b.x3f.GetSizeInBytes());
+    std::memcpy(pfield->b1.x3f.data(), &(mbdata[os]), pfield->b1.x3f.GetSizeInBytes());
     os += pfield->b.x3f.GetSizeInBytes();
   }
 
   // (conserved variable) Passive scalars:
   if (NSCALARS > 0) {
     std::memcpy(pscalars->s.data(), &(mbdata[os]), pscalars->s.GetSizeInBytes());
+    // load it into the other memory register(s) too
+    std::memcpy(pscalars->s1.data(), &(mbdata[os]), pscalars->s1.GetSizeInBytes());
     os += pscalars->s.GetSizeInBytes();
   }
 
@@ -352,7 +361,6 @@ MeshBlock::~MeshBlock() {
   delete peos;
   delete porb;
   if (SELF_GRAVITY_ENABLED) delete pgrav;
-  if (SELF_GRAVITY_ENABLED == 2) delete pmg;
   if (NSCALARS > 0) delete pscalars;
 
   // BoundaryValues should be destructed AFTER all BoundaryVariable objects are destroyed
@@ -450,6 +458,8 @@ std::size_t MeshBlock::GetBlockSizeInBytes() {
   if (MAGNETIC_FIELDS_ENABLED)
     size += (pfield->b.x1f.GetSizeInBytes() + pfield->b.x2f.GetSizeInBytes()
              + pfield->b.x3f.GetSizeInBytes());
+  if (SELF_GRAVITY_ENABLED)
+    size += pgrav->phi.GetSizeInBytes();
   if (NSCALARS > 0)
     size += pscalars->s.GetSizeInBytes();
 

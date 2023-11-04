@@ -196,12 +196,14 @@ void EquationOfState::ConservedToPrimitive(
                      + g_(I33,i)*SQR(uu3);
           gamma = std::sqrt(1.0 + tmp);
         }
+        bool velocity_ceiling = false;
         if (gamma > gamma_max_) {
           Real factor = std::sqrt((SQR(gamma_max_)-1.0) / (SQR(gamma)-1.0));
           uu1 *= factor;
           uu2 *= factor;
           uu3 *= factor;
           fixed = true;
+          velocity_ceiling = true;
         }
 
         // Recalculate density and pressure floors given new velocity
@@ -467,11 +469,11 @@ bool ConservedToPrimitiveNormal(
     AthenaArray<Real> &prim, Real *p_gamma_lor) {
   // Parameters
   const int max_iterations = 15;
-  const Real tol = 1.0e-12;
-  const Real pgas_uniform_min = 1.0e-12;
-  const Real a_min = 1.0e-12;
-  const Real v_sq_max = 1.0 - 1.0e-12;
-  const Real rr_max = 1.0 - 1.0e-12;
+  const Real tol = 1.0e-32;
+  const Real pgas_uniform_min = 1.0e-32;
+  const Real a_min = 1.0e-32;
+  const Real v_sq_max = 1.0 - 1.0e-32;
+  const Real rr_max = 1.0 - 1.0e-32;
 
   // Extract conserved values
   const Real &dd = dd_vals(i);

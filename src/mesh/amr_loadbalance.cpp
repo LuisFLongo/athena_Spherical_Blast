@@ -12,7 +12,6 @@
 #include <algorithm>  // std::sort()
 #include <cstdint>
 #include <iostream>
-#include <limits>
 #include <sstream>
 
 // Athena++ headers
@@ -54,10 +53,8 @@ void Mesh::LoadBalancingAndAdaptiveMeshRefinement(ParameterInput *pin) {
     GatherCostListAndCheckBalance();
     RedistributeAndRefineMeshBlocks(pin, nbtotal + nnew - ndel);
   } else if (lb_flag_ && step_since_lb >= lb_interval_) {
-    if (!GatherCostListAndCheckBalance()) { // load imbalance detected
-      amr_updated = true;
+    if (!GatherCostListAndCheckBalance()) // load imbalance detected
       RedistributeAndRefineMeshBlocks(pin, nbtotal);
-    }
     lb_flag_ = false;
   }
   return;
@@ -111,13 +108,13 @@ void Mesh::CalculateLoadBalance(double *clist, int *rlist, int *slist, int *nlis
   }
   nlist[j] = nb-slist[j];
 
-  // if (Globals::my_rank == 0) {
-  //   for (int i=0; i<Globals::nranks; i++) {
-  //     double rcost = 0.0;
-  //     for(int n=slist[i]; n<slist[i]+nlist[i]; n++)
-  //       rcost += clist[n];
-  //   }
-  // }
+  if (Globals::my_rank == 0) {
+    for (int i=0; i<Globals::nranks; i++) {
+      double rcost = 0.0;
+      for(int n=slist[i]; n<slist[i]+nlist[i]; n++)
+        rcost += clist[n];
+    }
+  }
 
 #ifdef MPI_PARALLEL
   if (nb % (Globals::nranks * num_mesh_threads_) != 0
@@ -567,7 +564,7 @@ void Mesh::RedistributeAndRefineMeshBlocks(ParameterInput *pin, int ntot) {
       BoundaryFlag block_bcs[6];
       SetBlockSizeAndBoundaries(newloc[n], block_size, block_bcs);
       newlist(n-nbs) = new MeshBlock(n, n-nbs, newloc[n], block_size, block_bcs, this,
-                                     pin, true);
+                                     pin, gflag, true);
       // fill the conservative variables
       if ((loclist[on].level > newloc[n].level)) { // fine to coarse (f2c)
         for (int ll=0; ll<nleaf; ll++) {

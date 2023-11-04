@@ -226,10 +226,9 @@ int main(int argc, char *argv[]) {
     if (res_flag == 1) {
       restartfile.Open(restart_filename, IOWrapper::FileMode::read);
       pinput->LoadFromFile(restartfile);
-      // make sure next_time gets corrected in case -i input file or cmdline args change
-      // the output next_time, dt, etc.
+      // If both -r and -i are specified, make sure next_time gets corrected.
       // This needs to be corrected on the restart file because we need the old dt.
-      pinput->RollbackNextTime();
+      if (iarg_flag == 1) pinput->RollbackNextTime();
       // leave the restart file open for later use
     }
     if (iarg_flag == 1) {
@@ -296,9 +295,8 @@ int main(int argc, char *argv[]) {
 #endif // ENABLE_EXCEPTIONS
 
   // With current mesh time possibly read from restart file, correct next_time for outputs
-  if (res_flag == 1) {
-    // ensure that next_time  >= mesh_time - dt, in case input file or command line
-    // overrides it
+  if (iarg_flag == 1 && res_flag == 1) {
+    // if both -r and -i are specified, ensure that next_time  >= mesh_time - dt
     pinput->ForwardNextTime(pmesh->time);
   }
 
@@ -520,15 +518,8 @@ int main(int argc, char *argv[]) {
   if (Globals::my_rank == 0 && wtlim > 0)
     SignalHandler::CancelWallTimeAlarm();
 
-
   //--- Step 9. --------------------------------------------------------------------------
-  // Output the final cycle diagnostics and make the final outputs
-
-  if (Globals::my_rank == 0)
-    pmesh->OutputCycleDiagnostics();
-
-  pmesh->UserWorkAfterLoop(pinput);
-
+  // Make the final outputs
 #ifdef ENABLE_EXCEPTIONS
   try {
 #endif
@@ -552,10 +543,12 @@ int main(int argc, char *argv[]) {
   }
 #endif // ENABLE_EXCEPTIONS
 
+  pmesh->UserWorkAfterLoop(pinput);
+
   //--- Step 10. -------------------------------------------------------------------------
   // Print diagnostic messages related to the end of the simulation
-
   if (Globals::my_rank == 0) {
+    pmesh->OutputCycleDiagnostics();
     if (SignalHandler::GetSignalFlag(SIGTERM) != 0) {
       std::cout << std::endl << "Terminating on Terminate signal" << std::endl;
     } else if (SignalHandler::GetSignalFlag(SIGINT) != 0) {

@@ -10,7 +10,7 @@
 
 // C++ headers
 #include <algorithm>  // min()
-#include <cmath>      // abs(), sqrt()
+#include <cmath>      // fabs(), sqrt()
 #include <limits>
 
 // Athena++ headers

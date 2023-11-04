@@ -41,13 +41,14 @@ void HydroSourceTerms::SelfGravity(const Real dt,const AthenaArray<Real> *flux,
 #pragma omp simd
       for (int i=pmb->is; i<=pmb->ie; ++i) {
         Real dx1 = pmb->pcoord->dx1v(i);
-        Real hdtodx1 = 0.5*dt/dx1;
-        Real dpl = -(pgrav->phi(k,j,i  ) - pgrav->phi(k,j,i-1));
-        Real dpr = -(pgrav->phi(k,j,i+1) - pgrav->phi(k,j,i  ));
-        cons(IM1,k,j,i) += hdtodx1 * prim(IDN,k,j,i) * (dpl + dpr);
+        Real dtodx1 = dt/dx1;
+        Real phic = pgrav->phi(k,j,i);
+        Real phil = 0.5*(pgrav->phi(k,j,i-1)+pgrav->phi(k,j,i  ));
+        Real phir = 0.5*(pgrav->phi(k,j,i  )+pgrav->phi(k,j,i+1));
+        cons(IM1,k,j,i) -= dtodx1*prim(IDN,k,j,i)*(phir-phil);
         if (NON_BAROTROPIC_EOS)
-          cons(IEN,k,j,i) += hdtodx1 * (flux[X1DIR](IDN,k,j,i  ) * dpl
-                                     +  flux[X1DIR](IDN,k,j,i+1) * dpr);
+          cons(IEN,k,j,i) -= dtodx1*(flux[X1DIR](IDN,k,j,i  )*(phic - phil) +
+                                     flux[X1DIR](IDN,k,j,i+1)*(phir - phic));
       }
     }
   }
@@ -59,13 +60,14 @@ void HydroSourceTerms::SelfGravity(const Real dt,const AthenaArray<Real> *flux,
 #pragma omp simd
         for (int i=pmb->is; i<=pmb->ie; ++i) {
           Real dx2 = pmb->pcoord->dx2v(j);
-          Real hdtodx2 = 0.5*dt/dx2;
-          Real dpl = -(pgrav->phi(k,j,  i) - pgrav->phi(k,j-1,i));
-          Real dpr = -(pgrav->phi(k,j+1,i) - pgrav->phi(k,j,  i));
-          cons(IM2,k,j,i) += hdtodx2 * prim(IDN,k,j,i) * (dpl + dpr);
+          Real dtodx2 = dt/dx2;
+          Real phic = pgrav->phi(k,j,i);
+          Real phil = 0.5*(pgrav->phi(k,j-1,i)+pgrav->phi(k,j  ,i));
+          Real phir = 0.5*(pgrav->phi(k,j  ,i)+pgrav->phi(k,j+1,i));
+          cons(IM2,k,j,i) -= dtodx2*prim(IDN,k,j,i)*(phir-phil);
           if (NON_BAROTROPIC_EOS)
-            cons(IEN,k,j,i) += hdtodx2 * (flux[X2DIR](IDN,k,j,  i) * dpl
-                                       +  flux[X2DIR](IDN,k,j+1,i) * dpr);
+            cons(IEN,k,j,i) -= dtodx2*(flux[X2DIR](IDN,k,j  ,i)*(phic - phil) +
+                                       flux[X2DIR](IDN,k,j+1,i)*(phir - phic));
         }
       }
     }
@@ -78,13 +80,14 @@ void HydroSourceTerms::SelfGravity(const Real dt,const AthenaArray<Real> *flux,
 #pragma omp simd
         for (int i=pmb->is; i<=pmb->ie; ++i) {
           Real dx3 = pmb->pcoord->dx3v(k);
-          Real hdtodx3 = 0.5*dt/dx3;
-          Real dpl = -(pgrav->phi(k,  j,i) - pgrav->phi(k-1,j,i));
-          Real dpr = -(pgrav->phi(k+1,j,i) - pgrav->phi(k,  j,i));
-          cons(IM3,k,j,i) += hdtodx3 * prim(IDN,k,j,i) * (dpl + dpr);
+          Real dtodx3 = dt/dx3;
+          Real phic = pgrav->phi(k,j,i);
+          Real phil = 0.5*(pgrav->phi(k-1,j,i)+pgrav->phi(k  ,j,i));
+          Real phir = 0.5*(pgrav->phi(k  ,j,i)+pgrav->phi(k+1,j,i));
+          cons(IM3,k,j,i) -= dtodx3*prim(IDN,k,j,i)*(phir-phil);
           if (NON_BAROTROPIC_EOS)
-            cons(IEN,k,j,i) += hdtodx3 * (flux[X3DIR](IDN,k,  j,i) * dpl
-                                       +  flux[X3DIR](IDN,k+1,j,i) * dpr);
+            cons(IEN,k,j,i) -= dtodx3*(flux[X3DIR](IDN,k  ,j,i)*(phic - phil) +
+                                       flux[X3DIR](IDN,k+1,j,i)*(phir - phic));
         }
       }
     }

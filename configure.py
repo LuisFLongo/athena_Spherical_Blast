@@ -37,6 +37,7 @@
 #   --include=path    use -Ipath when compiling
 #   --lib_path=path   use -Lpath when linking
 #   --lib=xxx         use -lxxx when linking
+#   -exp              enable expanding grid
 # ----------------------------------------------------------------------------------------
 
 # Modules
@@ -94,6 +95,13 @@ parser.add_argument('--eos',
                     choices=['adiabatic', 'isothermal', 'general/eos_table',
                              'general/hydrogen', 'general/ideal'],
                     help='select equation of state')
+
+# Set Expanding Frame
+if args['exp']:
+	definitions['EXPANDING']='1'
+else:
+	definitions['EXPANDING']='0'
+
 
 # --flux=[name] argument
 parser.add_argument('--flux',
@@ -204,6 +212,12 @@ parser.add_argument('-h5double',
 parser.add_argument('--hdf5_path',
                     default='',
                     help='path to HDF5 libraries')
+
+# -exp argument
+parser.add_argument('-exp',
+		    default=False,
+		    action='store_true',
+		    help='Make Grid expand')
 
 # The main choices for --cxx flag, using "ctype[-suffix]" formatting, where "ctype" is the
 # major family/suite/group of compilers and "suffix" may represent variants of the
@@ -815,6 +829,7 @@ print('  Equation of state:          ' + args['eos'])
 print('  Riemann solver:             ' + args['flux'])
 print('  Magnetic fields:            ' + ('ON' if args['b'] else 'OFF'))
 print('  Number of scalars:          ' + args['nscalars'])
+print('  Expanding Frame:         ' + ('ON' if args['exp'] else 'OFF'))
 print('  Special relativity:         ' + ('ON' if args['s'] else 'OFF'))
 print('  General relativity:         ' + ('ON' if args['g'] else 'OFF'))
 print('  Frame transformations:      ' + ('ON' if args['t'] else 'OFF'))

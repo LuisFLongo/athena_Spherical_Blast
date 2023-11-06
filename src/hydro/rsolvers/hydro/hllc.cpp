@@ -46,6 +46,27 @@ void Hydro::RiemannSolver(const int k, const int j, const int il, const int iu,
   Real gm1 = gamma - 1.0;
   Real igm1 = 1.0/gm1;
 
+  //LFLM inclusion starts
+
+  //Expanding Grid objects
+  Expansion *ex = pmy_block->pex;
+  AthenaArray<Real> &eFlx = ex->expFlux[(ivx-1)];
+  AthenaArray<Real> &eVel = ex->vf[(ivx-1)];
+  bool move = false;
+  if ((ivx == IVX)&&(ex->x1Move)){
+  	move = true;
+  } else if ((ivx == IVY)&&(ex->x2Move)) {
+  	move = true;
+  } else if ((ivx == IVZ)&&(ex->x3Move)){
+  	move = true;
+  }
+  
+  Real wi[(NHYDRO)];
+  Real wallV = 0.0;
+  Real e;                               
+
+  //LFLM inclusion ends
+
 #pragma distribute_point
 #pragma omp simd private(wli,wri,flxi,fl,fr)
   for (int i=il; i<=iu; ++i) {
@@ -174,6 +195,60 @@ void Hydro::RiemannSolver(const int k, const int j, const int il, const int iu,
     flx(ivy,k,j,i) = flxi[IVY];
     flx(ivz,k,j,i) = flxi[IVZ];
     flx(IEN,k,j,i) = flxi[IEN];
+
+
+//LFLM inclusion starts
+
+    //For Time Dependent grid, account for Wall Flux
+    if ((EXPANDING) && (move)) {
+      //--- Step 1. Determine Flux Direction
+      if (ivx == IVX){
+        wallV = eVel(i);
+      } else if (ivx == IVY) {
+        wallV = eVel(j);
+      } else if (ivx == IVZ){
+        wallV = eVel(k);
+      } else {
+        wallV = 0.0;
+      }
+      //--- Step 2. Load primitive Variables
+      if (wallV > 0.0) {
+        wi[IDN]=wr(IDN,k,j,i);//eWri(IDN,k,j,i);
+        wi[IVX]=wr(ivx,k,j,i);//eWri(ivx,k,j,i);
+        wi[IVY]=wr(ivy,k,j,i);//eWri(ivy,k,j,i);
+        wi[IVZ]=wr(ivz,k,j,i);//eWri(ivz,k,j,i);
+        wi[IPR]=wr(IPR,k,j,i);//eWri(IPR,k,j,i);
+        if (DUAL_ENERGY) wi[IGE]=wr(IGE,k,j,i);//eWri(IGE,k,j,i);
+      } else if (wallV < 0.0) {
+        wi[IDN]=wl(IDN,k,j,i);//eWli(IDN,k,j,i);
+        wi[IVX]=wl(ivx,k,j,i);//eWli(ivx,k,j,i);
+        wi[IVY]=wl(ivy,k,j,i);//eWli(ivy,k,j,i);
+        wi[IVZ]=wl(ivz,k,j,i);//eWli(ivz,k,j,i);
+        wi[IPR]=wl(IPR,k,j,i);//eWli(IPR,k,j,i);
+        if (DUAL_ENERGY) wi[IGE]=wl(IGE,k,j,i);//eWli(IGE,k,j,i);
+      } else {
+        wi[IDN]=0.0;
+        wi[IVX]=0.0;
+        wi[IVY]=0.0;
+        wi[IVZ]=0.0;
+        wi[IPR]=0.0;
+        if (DUAL_ENERGY) wi[IGE]=0.0;
+      }
+      e = wi[IPR]*igm1 + 0.5*wi[IDN]*(SQR(wi[IVX]) + SQR(wi[IVY]) + SQR(wi[IVZ]));
+      eFlx(IDN,k,j,i) = wi[IDN]*wallV;
+      eFlx(ivx,k,j,i) = wi[IDN]*wi[IVX]*wallV;
+      eFlx(ivy,k,j,i) = wi[IDN]*wi[IVY]*wallV;
+      eFlx(ivz,k,j,i) = wi[IDN]*wi[IVZ]*wallV;
+      eFlx(IEN,k,j,i) = e*wallV;
+      if (DUAL_ENERGY) {
+        eFlx(IIE,k,j,i) = wallV*wi[IGE];
+      }
+    } //End Expanding
+
+
+
+//LFLM inclusion ends
+
   }
   return;
 }

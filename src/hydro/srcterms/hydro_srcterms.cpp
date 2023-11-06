@@ -106,6 +106,10 @@ HydroSourceTerms::HydroSourceTerms(Hydro *phyd, ParameterInput *pin) {
 
   if (SELF_GRAVITY_ENABLED) hydro_sourceterms_defined = true;
 
+//LFLM inclusion starts
+  if (EXPANDING) hydro_sourceterms_defined = true;
+//LFLM inclusion ends
+
   UserSourceTerm = phyd->pmy_block->pmy_mesh->UserSourceTerm_;
   if (UserSourceTerm != nullptr) hydro_sourceterms_defined = true;
 }
@@ -149,6 +153,12 @@ void HydroSourceTerms::AddHydroSourceTerms(const Real time, const Real dt,
   if (UserSourceTerm != nullptr) {
     UserSourceTerm(pmb, time, dt, prim, prim_scalar, bcc, cons, cons_scalar);
   }
+
+//LFLM inclusion starts
+
+  if (EXPANDING) pmb->pex->ExpansionSourceTerms(dt,flux,prim,cons);
+
+//LFLM inclusion ends
 
   return;
 }

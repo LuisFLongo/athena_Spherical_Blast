@@ -897,6 +897,22 @@ TimeIntegratorTaskList::TimeIntegratorTaskList(ParameterInput *pin, Mesh *pm) {
 
   // Now assemble list of tasks for each stage of time integrator
   {using namespace HydroIntegratorTaskNames; // NOLINT (build/namespace)
+//LFLM inclusion starts
+//comment: there are more lines of code in the original version of the co-scaling branch
+//         nevertheless they appear to be related with other configurations of the code
+//         such as "CLESS_ONLY_MODE" which at this stage is not clear if it is necessary
+//         for the expanding grid. I ported only what I naively deemed necessary
+//
+
+    AddTask(STARTUP_INT,NONE);
+    AddTask(START_ALLRECV,STARTUP_INT);
+    if (EXPANDING) {
+      AddTask(EXP_CALC,STARTUP_INT);
+      AddTask(EXP_INT,EXP_CALC);
+    }
+
+//LFLM inclusion ends
+
     // calculate hydro/field diffusive fluxes
     if (!STS_ENABLED) {
       AddTask(DIFFUSE_HYD,NONE);
@@ -1083,7 +1099,21 @@ TimeIntegratorTaskList::TimeIntegratorTaskList(ParameterInput *pin, Mesh *pm) {
     }
 
     // everything else
-    AddTask(PHY_BVAL,CONS2PRIM);
+//    AddTask(PHY_BVAL,CONS2PRIM); LFLM comment: it out, it seems that this is to be replaced IF
+//    					 	 the expanding option is turn on, take a closer look
+//    					 	 in the next few added lines
+
+//LFLM inclusion starts
+
+    if (EXPANDING) {
+      AddTask(EXP_EDIT,CON2PRIM);
+      AddTask(PHY_BVAL,EXP_EDIT);
+    } else {
+      AddTask(PHY_BVAL,CON2PRIM);
+    }
+
+//LFLM inclusion ends
+
     if (!STS_ENABLED || pm->sts_integrator == "rkl1") {
       AddTask(USERWORK,PHY_BVAL);
       AddTask(NEW_DT,USERWORK);

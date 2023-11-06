@@ -463,6 +463,16 @@ int main(int argc, char *argv[]) {
           pmesh->pfgrd->Solve(stage, 0);
         else if (SELF_GRAVITY_ENABLED == 2) // multigrid
           pmesh->pmgrd->Solve(stage);
+
+// LFLM inclusion starts
+        if (EXPANDING) {
+          pmesh->CalcGridData_(pmesh);
+        }
+        ptlist->DoTaskListOneStage(pmesh, stage);
+        if (EXPANDING) {
+          pmesh->SetMeshSize(pmesh);
+        }
+// LFLM inclusion ends
       }
     }
 

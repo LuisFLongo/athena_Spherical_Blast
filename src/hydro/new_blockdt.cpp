@@ -181,6 +181,15 @@ void Hydro::NewBlockTimeStep() {
     // otherwise, take the smallest of the hyperbolic, parabolic, user timesteps
     min_dt = std::min(min_dt, min_dt_parabolic);
   }
+//LFLM addition starts
+  if (EXPANDING) {
+    min_dt = std::min(min_dt, pmb->pex->GridTimeStep(pmb));
+    min_dt_hyperbolic = std::min(min_dt_hyperbolic, pmb->pex->GridTimeStep(pmb)); // This last 3 lines were not present in the original
+    min_dt_parabolic = std::min(min_dt_parabolic, pmb->pex->GridTimeStep(pmb));   // co-scaling grid branch, but by the logical flow of
+    min_dt_user = std::min(min_dt_user, pmb->pex->GridTimeStep(pmb));             // the code, I assumed them to be necessary
+  }
+//LFLM addition ends
+
   pmb->new_block_dt_ = min_dt;
   pmb->new_block_dt_hyperbolic_ = min_dt_hyperbolic;
   pmb->new_block_dt_parabolic_ = min_dt_parabolic;

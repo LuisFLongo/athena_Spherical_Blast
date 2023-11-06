@@ -20,6 +20,10 @@
 #include "../mesh/mesh.hpp"
 #include "hydro.hpp"
 
+#include "../field/field.hpp"
+#include "../bvals/bvals.hpp"
+#include "../reconstruct/reconstruction.hpp"
+
 // OpenMP header
 #ifdef OPENMP_PARALLEL
 #include <omp.h>

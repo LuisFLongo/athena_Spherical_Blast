@@ -96,12 +96,6 @@ parser.add_argument('--eos',
                              'general/hydrogen', 'general/ideal'],
                     help='select equation of state')
 
-# Set Expanding Frame
-if args['exp']:
-	definitions['EXPANDING']='1'
-else:
-	definitions['EXPANDING']='0'
-
 
 # --flux=[name] argument
 parser.add_argument('--flux',
@@ -395,6 +389,13 @@ else:
     definitions['NHYDRO_VARIABLES'] = '5'
     if args['eos'] == 'general/eos_table':
         definitions['EOS_TABLE_ENABLED'] = '1'
+
+#Set Expanding Frame
+if args['exp']:
+    definitions['EXPANDING'] = '1'
+else:
+    definitions['EXPANDING'] = '0'
+
 
 # --flux=[name] argument
 definitions['RSOLVER'] = makefile_options['RSOLVER_FILE'] = args['flux']

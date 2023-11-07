@@ -267,6 +267,13 @@ class Mesh {
   void UserWorkAfterLoop(ParameterInput *pin);   // called in main loop
   void UserWorkInLoop(); // called in main after each cycle
 
+  //LFLM inclusion starts
+  WallVel_t GridDiffEq_;
+  CalcGridData_t CalcGridData_;
+  void SetMeshSize(Mesh *pm);
+  AthenaArray<Real> GridData;
+  //LFLM inclusion ends
+
  private:
   // data
   int next_phys_id_; // next unused value for encoding final component of MPI tag bitfield
@@ -378,6 +385,12 @@ class Mesh {
   void SetGravitationalConstant(Real g) { four_pi_G_=4.0*PI*g; }
   void SetFourPiG(Real fpg) { four_pi_G_=fpg; }
   void SetGravityThreshold(Real eps) { grav_eps_=eps; }
+
+//LFLM inclusion starts
+  void EnrollGridDiffEq(WallVel_t my_func);
+  void EnrollCalcGridData(CalcGridData_t my_func);
+  void SetGridData(int n);
+//LFLM inclusion ends
 };
 
 

@@ -52,6 +52,7 @@ class HydroDiffusion;
 class FieldDiffusion;
 class OrbitalAdvection;
 
+class Mesh; //LFLM inclusion
 //--------------------------------------------------------------------------------------
 //! \struct LogicalLocation
 //! \brief stores logical location and level of MeshBlock
@@ -209,5 +210,8 @@ using FieldDiffusionCoeffFunc = void (*)(
     int is, int ie, int js, int je, int ks, int ke);
 using OrbitalVelocityFunc = Real (*)(
     OrbitalAdvection *porb, Real x1, Real x2, Real x3);
+
+typedef Real (*WallVel_t)(Real xf, int i, Real time, Real dt, int dir, AthenaArray<Real> gridData); //LFLM inclusion
+typedef void (*CalcGridData_t)(Mesh *pm); //LFLM inclusion
 
 #endif // ATHENA_HPP_

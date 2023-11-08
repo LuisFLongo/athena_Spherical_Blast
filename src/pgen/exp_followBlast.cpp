@@ -145,7 +145,8 @@ void UpdateGridData(Mesh *pm) {
     pm->GridData(11) = xMax;
     pm->GridData(8) = xMin;
 
-    MeshBlock *pmb = pm->pblock;
+    MeshBlock *pmb = pm->pblock;//LFLM comment
+    //MeshBlock *pmb = pm->pmb;     //LFLM inclusion
     Real myVel = 0.0;
     Real pos  = 0.0;
     Real cellsize = 2.0*pm->mesh_size.x1max/pm->mesh_size.nx1;
@@ -189,7 +190,8 @@ void UpdateGridData(Mesh *pm) {
   } else {
     xMax = pm->mesh_size.x1max;
     pm->GridData(3) = xMax;
-    MeshBlock *pmb = pm->pblock;
+    MeshBlock *pmb = pm->pblock;//LFLM comment
+    //MeshBlock *pmb=pm->pmb;//LFLM inclusion
     Real myVel = 0.0;
     Real pos  = 0.0;
     Real cellsize = pm->mesh_size.x1max/pm->mesh_size.nx1;

@@ -218,21 +218,21 @@ void Hydro::RiemannSolver(const int k, const int j, const int il, const int iu,
         wi[IVY]=wr(ivy,k,j,i);//eWri(ivy,k,j,i);
         wi[IVZ]=wr(ivz,k,j,i);//eWri(ivz,k,j,i);
         wi[IPR]=wr(IPR,k,j,i);//eWri(IPR,k,j,i);
-        if (DUAL_ENERGY) wi[IGE]=wr(IGE,k,j,i);//eWri(IGE,k,j,i);
+        //if (DUAL_ENERGY) wi[IGE]=wr(IGE,k,j,i);//eWri(IGE,k,j,i); //LFLM commented it compared to the original expanding grid branch
       } else if (wallV < 0.0) {
         wi[IDN]=wl(IDN,k,j,i);//eWli(IDN,k,j,i);
         wi[IVX]=wl(ivx,k,j,i);//eWli(ivx,k,j,i);
         wi[IVY]=wl(ivy,k,j,i);//eWli(ivy,k,j,i);
         wi[IVZ]=wl(ivz,k,j,i);//eWli(ivz,k,j,i);
         wi[IPR]=wl(IPR,k,j,i);//eWli(IPR,k,j,i);
-        if (DUAL_ENERGY) wi[IGE]=wl(IGE,k,j,i);//eWli(IGE,k,j,i);
+        //if (DUAL_ENERGY) wi[IGE]=wl(IGE,k,j,i);//eWli(IGE,k,j,i); //LFLM commented it compared to the original expanding grid branch
       } else {
         wi[IDN]=0.0;
         wi[IVX]=0.0;
         wi[IVY]=0.0;
         wi[IVZ]=0.0;
         wi[IPR]=0.0;
-        if (DUAL_ENERGY) wi[IGE]=0.0;
+        //if (DUAL_ENERGY) wi[IGE]=0.0; //LFLM commented it compared to the original expanding grid branch
       }
       e = wi[IPR]*igm1 + 0.5*wi[IDN]*(SQR(wi[IVX]) + SQR(wi[IVY]) + SQR(wi[IVZ]));
       eFlx(IDN,k,j,i) = wi[IDN]*wallV;
@@ -240,9 +240,9 @@ void Hydro::RiemannSolver(const int k, const int j, const int il, const int iu,
       eFlx(ivy,k,j,i) = wi[IDN]*wi[IVY]*wallV;
       eFlx(ivz,k,j,i) = wi[IDN]*wi[IVZ]*wallV;
       eFlx(IEN,k,j,i) = e*wallV;
-      if (DUAL_ENERGY) {
-        eFlx(IIE,k,j,i) = wallV*wi[IGE];
-      }
+      //if (DUAL_ENERGY) {                  //LFLM commented it compared to the original expanding grid branch
+      //  eFlx(IIE,k,j,i) = wallV*wi[IGE];  //LFLM commented it compared to the original expanding grid branch
+      //}                                   //LFLM commented it compared to the original expanding grid branch
     } //End Expanding
 
 

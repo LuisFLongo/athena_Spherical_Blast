@@ -1106,10 +1106,10 @@ TimeIntegratorTaskList::TimeIntegratorTaskList(ParameterInput *pin, Mesh *pm) {
 //LFLM inclusion starts
 
     if (EXPANDING) {
-      AddTask(EXP_EDIT,CON2PRIM);
+      AddTask(EXP_EDIT,CONS2PRIM);
       AddTask(PHY_BVAL,EXP_EDIT);
     } else {
-      AddTask(PHY_BVAL,CON2PRIM);
+      AddTask(PHY_BVAL,CONS2PRIM);
     }
 
 //LFLM inclusion ends

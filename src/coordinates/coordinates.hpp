@@ -22,6 +22,7 @@
 #include "../athena_arrays.hpp"
 #include "../hydro/srcterms/hydro_srcterms.hpp"
 #include "../mesh/mesh.hpp"
+#include "../expansion/expansion.hpp"
 
 // forward declarations
 class MeshBlock;
@@ -33,6 +34,7 @@ class ParameterInput;
 
 class Coordinates {
  public:
+  friend class Expansion; //LFLM inclusion
   friend class HydroSourceTerms;
   Coordinates(MeshBlock *pmb, ParameterInput *pin, bool flag = false);
   virtual ~Coordinates() = default;

@@ -53,6 +53,7 @@ class FFTDriver;
 class FFTGravityDriver;
 class TurbulenceDriver;
 class OrbitalAdvection;
+class Expansion; //LFLM inclusion
 
 FluidFormulation GetFluidFormulation(const std::string& input_string);
 
@@ -68,6 +69,7 @@ class MeshBlock {
   friend class Mesh;
   friend class Hydro;
   friend class TaskList;
+ 
 #ifdef HDF5OUTPUT
   friend class ATHDF5Output;
 #endif
@@ -118,6 +120,8 @@ class MeshBlock {
   PassiveScalars *pscalars;
   EquationOfState *peos;
   OrbitalAdvection *porb;
+  Expansion *pex;           //LFLM inclusion
+  MeshBlock *prev, *next;   //LFLM inclusion
 
   // functions
   std::size_t GetBlockSizeInBytes();
@@ -201,6 +205,8 @@ class Mesh {
   friend class HydroDiffusion;
   friend class FieldDiffusion;
   friend class OrbitalAdvection;
+  friend class Expansion; // LFLM inclusion
+
 #ifdef HDF5OUTPUT
   friend class ATHDF5Output;
 #endif
@@ -212,9 +218,19 @@ class Mesh {
   ~Mesh();
 
   // accessors
-  int GetNumMeshThreads() const {return num_mesh_threads_;}
-  std::int64_t GetTotalCells() {return static_cast<std::int64_t> (nbtotal)*
-  my_blocks(0)->block_size.nx1*my_blocks(0)->block_size.nx2*my_blocks(0)->block_size.nx3;}
+  // LFLM comment starts
+  //int GetNumMeshThreads() const {return num_mesh_threads_;}
+  //std::int64_t GetTotalCells() {return static_cast<std::int64_t> (nbtotal)*
+  //my_blocks(0)->block_size.nx1*my_blocks(0)->block_size.nx2*my_blocks(0)->block_size.nx3;}
+  // LFLM comment ends  
+
+   //LFLM inclusion starts
+   int GetNumMeshBlocksThisRank(int my_rank) {return nblist[my_rank];}
+   int GetNumMeshThreads() const {return num_mesh_threads_;}
+   int64_t GetTotalCells() {return static_cast<int64_t> (nbtotal)*
+     pblock->block_size.nx1*pblock->block_size.nx2*pblock->block_size.nx3;}
+   //LFLM inclusion ends
+
 
   // data
   RegionSize mesh_size;
@@ -240,6 +256,8 @@ class Mesh {
   EosTable *peos_table;
 
   AthenaArray<MeshBlock*> my_blocks;
+
+  MeshBlock *pblock; //LFLM inclusion
 
   TurbulenceDriver *ptrbd;
   FFTGravityDriver *pfgrd;

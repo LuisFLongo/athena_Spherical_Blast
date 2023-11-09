@@ -1952,3 +1952,88 @@ void Mesh::OutputCycleDiagnostics() {
   }
   return;
 }
+
+
+//LFLM inclusion starts
+
+
+void Mesh::EnrollGridDiffEq(WallVel_t my_func) {
+  if (EXPANDING) {
+    GridDiffEq_ = my_func;
+  }
+  return;
+}
+
+
+void Mesh::SetGridData(int n) {
+  if (EXPANDING) {
+    GridData.NewAthenaArray(n);
+  }
+  return;
+}
+
+void Mesh::EnrollCalcGridData(CalcGridData_t my_func) {
+  if (EXPANDING) {
+    CalcGridData_ = my_func;
+  }
+  return;
+}
+
+
+void Mesh::SetMeshSize(Mesh *pm) {
+  if (EXPANDING) {
+    Real inner = 0.0;
+    Real outer = 0.0;
+    MeshBlock *pmb = pm->pblock;
+
+    if (pmb->pex->x1Move) {
+      //x1
+      inner = 0.0;
+      outer = 0.0;
+
+      while (pmb != NULL) {
+        inner = std::min(pmb->block_size.x1min,inner);
+        outer = std::max(pmb->block_size.x1max,outer);
+        pmb = pmb->next;
+      }
+
+#ifdef MPI_PARALLEL
+      MPI_Allreduce(MPI_IN_PLACE,&inner,1,MPI_ATHENA_REAL,MPI_MIN,
+                   MPI_COMM_WORLD);
+      MPI_Allreduce(MPI_IN_PLACE,&outer,1,MPI_ATHENA_REAL,MPI_MAX,
+                   MPI_COMM_WORLD);
+#endif
+
+      pm->mesh_size.x1min = inner;
+      pm->mesh_size.x1max = outer;
+    }
+    pmb = pm->pblock;
+
+    if (pmb->pex->x2Move) {
+      //x1
+      inner = 0.0;
+      outer = 0.0;
+
+      while (pmb != NULL) {
+        inner = std::min(pmb->block_size.x3min,inner);
+        outer = std::max(pmb->block_size.x3max,outer);
+        pmb = pmb->next;
+      }
+
+#ifdef MPI_PARALLEL
+      MPI_Allreduce(MPI_IN_PLACE,&inner,1,MPI_ATHENA_REAL,MPI_MIN,
+                   MPI_COMM_WORLD);
+      MPI_Allreduce(MPI_IN_PLACE,&outer,1,MPI_ATHENA_REAL,MPI_MAX,
+                   MPI_COMM_WORLD);
+#endif
+
+      pm->mesh_size.x3min = inner;
+      pm->mesh_size.x3max = outer;
+    }
+
+  }
+  return;
+}
+
+
+//LFLM inclusion ends

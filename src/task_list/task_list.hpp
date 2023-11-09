@@ -201,6 +201,15 @@ class TimeIntegratorTaskList : public TaskList {
   TaskStatus ReceiveFieldOrbital(MeshBlock *pmb, int stage);
   TaskStatus CalculateFieldOrbital(MeshBlock *pmb, int stage);
 
+//LFLM inclusion starts
+
+  TaskStatus GridMove(MeshBlock *pmb, int stage);
+  TaskStatus GridCalculate(MeshBlock *pmb, int stage);
+  TaskStatus GridIntegrate(MeshBlock *pmb, int stage);
+
+//LFLM inclusion ends
+
+
   bool CheckNextMainStage(int stage) const {return stage_wghts[stage%nstages].main_stage;}
 
  private:

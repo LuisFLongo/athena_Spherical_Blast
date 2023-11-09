@@ -31,6 +31,8 @@
 #include "../reconstruct/reconstruction.hpp"
 #include "../scalars/scalars.hpp"
 #include "task_list.hpp"
+#include "../expansion/expansion.hpp" //LFLM inclusion
+
 
 //----------------------------------------------------------------------------------------
 //! TimeIntegratorTaskList constructor
@@ -2408,3 +2410,57 @@ TaskStatus TimeIntegratorTaskList::CalculateFieldOrbital(MeshBlock *pmb, int sta
   }
   return TaskStatus::fail;
 }
+
+
+//LFLM inclusion starts
+enum TaskStatus TimeIntegratorTaskList::GridMove(MeshBlock *pmb, int stage){
+  Real dt = (stage_wghts[(stage-1)].beta)*(pmb->pmy_mesh->dt);
+  Hydro *ph=pmb->phydro;
+  bool last = (stage == nstages);
+  pmb->pex->GridEdit(pmb,last);
+  //pmb->pex->ExpansionSourceTerms(pmb,dt,ph->u);
+  return TaskStatus::success;
+}
+enum TaskStatus TimeIntegratorTaskList::GridCalculate(MeshBlock *pmb, int stage){
+  Real dt = (stage_wghts[(stage-1)].beta)*(pmb->pmy_mesh->dt);
+  Expansion *px = pmb->pex;
+  if (stage == 1) {
+    Real ave_wghts[3];
+    ave_wghts[0] = 0.0;
+    ave_wghts[1] = 0.0;
+    ave_wghts[2] = 0.0;
+    if (px->x1Move) px->WeightedAveX(px->il,px->iu + 1,px->x1_1,px->x1_0,px->x1_2,ave_wghts);
+    if (px->x2Move) px->WeightedAveX(px->jl,px->ju + 1,px->x2_1,px->x2_0,px->x2_2,ave_wghts);
+    if (px->x3Move) px->WeightedAveX(px->kl,px->ku + 1,px->x3_1,px->x3_0,px->x3_2,ave_wghts);
+  }
+  px->UpdateVelData(pmb,pmb->pmy_mesh->time,dt);
+  //std::cout << "stage=" << stage << std::endl;
+  return TaskStatus::success;
+}
+enum TaskStatus TimeIntegratorTaskList::GridIntegrate(MeshBlock *pmb, int stage){
+  Real dt = (stage_wghts[(stage-1)].beta)*(pmb->pmy_mesh->dt);
+  Expansion *px = pmb->pex;
+
+  if (stage <= nstages) {
+    // This time-integrator-specific averaging operation logic is identical to FieldInt
+    Real ave_wghts[3];
+    ave_wghts[0] = 1.0;
+    ave_wghts[1] = stage_wghts[stage-1].delta;
+    ave_wghts[2] = 0.0;
+    if (px->x1Move) px->WeightedAveX(px->il,px->iu + 1,px->x1_1,px->x1_0,px->x1_2,ave_wghts);
+    if (px->x2Move) px->WeightedAveX(px->jl,px->ju + 1,px->x2_1,px->x2_0,px->x2_2,ave_wghts);
+    if (px->x3Move) px->WeightedAveX(px->kl,px->ku + 1,px->x3_1,px->x3_0,px->x3_2,ave_wghts);
+
+    ave_wghts[0] = stage_wghts[stage-1].gamma_1;
+    ave_wghts[1] = stage_wghts[stage-1].gamma_2;
+    ave_wghts[2] = stage_wghts[stage-1].gamma_3;
+    if (px->x1Move) px->WeightedAveX(px->il,px->iu + 1,px->x1_0,px->x1_1,px->x1_2,ave_wghts);
+    if (px->x2Move) px->WeightedAveX(px->jl,px->ju + 1,px->x2_0,px->x2_1,px->x2_2,ave_wghts);
+    if (px->x3Move) px->WeightedAveX(px->kl,px->ku + 1,px->x3_0,px->x3_1,px->x3_2,ave_wghts);
+
+    px->IntegrateWalls(dt);
+  }
+  return TaskStatus::success;
+}
+
+//LFLM inclusion ends

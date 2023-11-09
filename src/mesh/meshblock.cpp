@@ -39,6 +39,8 @@
 #include "mesh.hpp"
 #include "mesh_refinement.hpp"
 #include "meshblock_tree.hpp"
+#include "../expansion/expansion.hpp" //LFLM inclusion
+
 
 //----------------------------------------------------------------------------------------
 //! MeshBlock constructor: constructs coordinate, boundary condition, hydro, field
@@ -182,6 +184,7 @@ MeshBlock::MeshBlock(int igid, int ilid, LogicalLocation iloc, RegionSize input_
   // Create user mesh data
   InitUserMeshBlockData(pin);
 
+   pex = new Expansion(this,pin); //LFLM inclusion stars
   return;
 }
 

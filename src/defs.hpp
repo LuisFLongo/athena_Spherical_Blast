@@ -15,7 +15,7 @@
 
 // configure.py dict(definitions) string values:
 // problem generator
-#define PROBLEM_GENERATOR "blast_try5_BC_v9_3"
+#define PROBLEM_GENERATOR "blast_try5_BC_v9_3_GR"
 
 // coordinate system
 #define COORDINATE_SYSTEM "schwarzschild"

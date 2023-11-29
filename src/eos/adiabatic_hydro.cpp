@@ -41,7 +41,7 @@ void EquationOfState::ConservedToPrimitive(
     AthenaArray<Real> &prim, AthenaArray<Real> &bcc,
     Coordinates *pco, int il, int iu, int jl, int ju, int kl, int ku) {
   Real gm1 = GetGamma() - 1.0;
-  printf("Entering ConservedToPrimitive \n");
+  //printf("Entering ConservedToPrimitive \n");
   for (int k=kl; k<=ku; ++k) {
     for (int j=jl; j<=ju; ++j) {
 #pragma omp simd
@@ -91,7 +91,7 @@ void EquationOfState::PrimitiveToConserved(
     AthenaArray<Real> &cons, Coordinates *pco,
     int il, int iu, int jl, int ju, int kl, int ku) {
   Real igm1 = 1.0/(GetGamma() - 1.0);
-  printf("Entering PrimitiveToConservative\n");
+  //printf("Entering PrimitiveToConservative\n");
   // Force outer-loop vectorization
 #pragma omp simd
   for (int k=kl; k<=ku; ++k) {
@@ -137,7 +137,7 @@ Real EquationOfState::SoundSpeed(const Real prim[NHYDRO]) {
 void EquationOfState::ApplyPrimitiveFloors(AthenaArray<Real> &prim, int k, int j, int i) {
   Real& w_d  = prim(IDN,i);
   Real& w_p  = prim(IPR,i);
-  printf("Entering ApplyPrimitiveFloors \n");
+  //printf("Entering ApplyPrimitiveFloors \n");
   // apply (prim) density floor
   w_d = (w_d > density_floor_) ?  w_d : density_floor_;
   // apply pressure floor
@@ -153,7 +153,7 @@ void EquationOfState::ApplyPrimitiveFloors(AthenaArray<Real> &prim, int k, int j
 void EquationOfState::ApplyPrimitiveConservedFloors(
     AthenaArray<Real> &prim, AthenaArray<Real> &cons, AthenaArray<Real> &bcc,
     int k, int j, int i) {
-  printf("Entering ApplyPrimitiveConservedFloors \n");
+  //printf("Entering ApplyPrimitiveConservedFloors \n");
   Real gm1 = GetGamma() - 1.0;
   Real& w_d  = prim(IDN,k,j,i);
   Real& w_p  = prim(IPR,k,j,i);

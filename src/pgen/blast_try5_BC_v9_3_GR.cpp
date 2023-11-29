@@ -93,8 +93,8 @@ void TransformVector(Real at, Real ax, Real ay, Real az, Real x, Real y, Real z,
 
 void Mesh::InitUserMeshData(ParameterInput *pin) {
 //LFLM inclusion start
-  Real pa   = pin->GetOrAddReal("problem", "pamb", 1.0);
-  Real da   = pin->GetOrAddReal("problem", "damb", 1.0);
+  pa   = pin->GetOrAddReal("problem", "pamb", 1.0);
+  da   = pin->GetOrAddReal("problem", "damb", 1.0);
   Gammaval  = pin->GetOrAddReal("hydro", "gamma", 1.0);
 
 
@@ -126,19 +126,19 @@ void Mesh::InitUserMeshData(ParameterInput *pin) {
   //BCNghts = 0;
   BCNghts = std::ceil(std::max(std::max(Nthetadown, Nthetaup),std::max(Nphidown, Nphiup)));
 
-  printf("Type of BCNghts is: \n");
+  //printf("Type of BCNghts is: \n");
   std::cout << typeid(BCNghts).name() << '\n';
 
-  printf("Number of ghost set to = %d \n", BCNghts);
+  //printf("Number of ghost set to = %d \n", BCNghts);
   float A1 = BCThetamax + BCNghts*BCDtheta;
   float A2 = BCThetamin - BCNghts*BCDtheta;
-  printf("New theta max = %6.40lf \n", A1 );
-  printf("New theta min = %6.40lf \n", A2 );
+  //printf("New theta max = %6.40lf \n", A1 );
+  //printf("New theta min = %6.40lf \n", A2 );
 
   float A3 = BCPhimax + BCNghts*BCDphi;
   float A4 = BCPhimin - BCNghts*BCDphi;
-  printf("New phi max = %6.40lf \n", A3 );
-  printf("New phi min = %6.40lf \n", A4 ); 
+  //printf("New phi max = %6.40lf \n", A3 );
+  //printf("New phi min = %6.40lf \n", A4 ); 
 
   //Gammaval = pin->GetReal("hydro","gamma");
   //Kval     = pin->GetReal("hydro","kappa");
@@ -218,7 +218,7 @@ int sign( double x ) {
 //========================================================================================
 
 void MeshBlock::ProblemGenerator(ParameterInput *pin) {
-  printf("Entering MeshBlock::ProblemGenerator \n");
+  //printf("Entering MeshBlock::ProblemGenerator \n");
   // Prepare index bounds
   int il = is - NGHOST;
   int iu = ie + NGHOST;
@@ -290,7 +290,7 @@ void MeshBlock::ProblemGenerator(ParameterInput *pin) {
   peos->PrimitiveToConserved(phydro->w, b, phydro->u, pcoord, il, iu, jl, ju, kl, ku);
 
 
-  printf("Exiting MeshBlock::ProblemGenerator \n");
+  //printf("Exiting MeshBlock::ProblemGenerator \n");
 }
 
 // LFLM implementation of the reader for the outflow data start
@@ -306,7 +306,7 @@ void OutflowReader(const char *filename, InterpTable3D *table) {
 //
 
 
-        printf(" Entering Outflow Reader\n");
+    //    printf(" Entering Outflow Reader\n");
 
         Real const c_light = 299792458.0; // Speed of light [m/s]
         Real const mu0 = 4.0 * M_PI * 1.0e-7; // Vacuum permeability [N/A^2]
@@ -566,11 +566,11 @@ void OutflowReader(const char *filename, InterpTable3D *table) {
                         }
                 }
         }
-        printf("data table's length is = %d \n",MVAL);
-        printf("data table has %d empty entries \n",NVAL);
+//        printf("data table's length is = %d \n",MVAL);
+//        printf("data table has %d empty entries \n",NVAL);
 
 
-	printf("Done with reading the data \n ");
+//	printf("Done with reading the data \n ");
 	return ;
 }
 
@@ -673,7 +673,7 @@ void InnerBoundary(MeshBlock *pmb, Coordinates *pcoord,
                   int il, int iu, int jl, int ju, int kl, int ku,
                   int ngh) {
 
-        printf("Entering BC condition \n");
+  //      printf("Entering BC condition \n");
 
         float BCThetamaxval = BCThetamax + BCNghts*BCDtheta;
         float BCThetaminval = BCThetamin - BCNghts*BCDtheta;

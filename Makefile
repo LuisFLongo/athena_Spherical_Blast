@@ -3,7 +3,7 @@
 
 # Files for conditional compilation
 
-PROBLEM_FILE = blast_try5_BC_v9_3.cpp
+PROBLEM_FILE = blast_try5_BC_v9_3_GR.cpp
 COORDINATES_FILE = schwarzschild.cpp
 EOS_FILE = adiabatic_hydro_gr.cpp
 GENERAL_EOS_FILE = noop.cpp

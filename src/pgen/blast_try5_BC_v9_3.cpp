@@ -75,8 +75,8 @@ Real WProfile(const Real th, const Real ph, const Real tm);
 
 void Mesh::InitUserMeshData(ParameterInput *pin) {
 //LFLM inclusion start
-  Real pa   = pin->GetOrAddReal("problem", "pamb", 1.0);
-  Real da   = pin->GetOrAddReal("problem", "damb", 1.0);
+  pa   = pin->GetOrAddReal("problem", "pamb", 1.0);
+  da   = pin->GetOrAddReal("problem", "damb", 1.0);
   Gammaval  = pin->GetOrAddReal("hydro", "gamma", 1.0);
 
 
@@ -108,19 +108,19 @@ void Mesh::InitUserMeshData(ParameterInput *pin) {
   //BCNghts = 0;
   BCNghts = std::ceil(std::max(std::max(Nthetadown, Nthetaup),std::max(Nphidown, Nphiup)));
 
-  printf("Type of BCNghts is: \n");
-  std::cout << typeid(BCNghts).name() << '\n';
-
-  printf("Number of ghost set to = %d \n", BCNghts);
+  //printf("Type of BCNghts is: \n");
+  //std::cout << typeid(BCNghts).name() << '\n';
+  
+  //printf("Number of ghost set to = %d \n", BCNghts);
   float A1 = BCThetamax + BCNghts*BCDtheta;
   float A2 = BCThetamin - BCNghts*BCDtheta;
-  printf("New theta max = %6.40lf \n", A1 );
-  printf("New theta min = %6.40lf \n", A2 );
+  //printf("New theta max = %6.40lf \n", A1 );
+  //printf("New theta min = %6.40lf \n", A2 );
 
   float A3 = BCPhimax + BCNghts*BCDphi;
   float A4 = BCPhimin - BCNghts*BCDphi;
-  printf("New phi max = %6.40lf \n", A3 );
-  printf("New phi min = %6.40lf \n", A4 ); 
+  //printf("New phi max = %6.40lf \n", A3 );
+  //printf("New phi min = %6.40lf \n", A4 ); 
 
   //Gammaval = pin->GetReal("hydro","gamma");
   //Kval     = pin->GetReal("hydro","kappa");
@@ -298,7 +298,7 @@ void MeshBlock::ProblemGenerator(ParameterInput *pin) {
       }
     }
   }
-  printf("Exiting MeshBlock::ProblemGenerator \n");
+  //printf("Exiting MeshBlock::ProblemGenerator \n");
 }
 
 // LFLM implementation of the reader for the outflow data start
@@ -314,7 +314,7 @@ void OutflowReader(const char *filename, InterpTable3D *table) {
 //
 
 
-        printf(" Entering Outflow Reader\n");
+        //printf(" Entering Outflow Reader\n");
 
         Real const c_light = 299792458.0; // Speed of light [m/s]
         Real const mu0 = 4.0 * M_PI * 1.0e-7; // Vacuum permeability [N/A^2]
@@ -425,35 +425,35 @@ void OutflowReader(const char *filename, InterpTable3D *table) {
                 }
 
                 table->data(0 , BCntheta, BCnphi, BCnt ) = BCrho; //density
-                if ( BCrho < Trhomin or  BCrho > Trhomax ){
-                        printf("density is outside of the table's range \n");
-                        printf("density was set \n");
-                        printf("rho = %6.40lf \n", BCrho);
-                }
+                //if ( BCrho < Trhomin or  BCrho > Trhomax ){
+                //        printf("density is outside of the table's range \n");
+                //        printf("density was set \n");
+                //        printf("rho = %6.40lf \n", BCrho);
+                //}
                 table->data(1,BCntheta, BCnphi, BCnt ) = BCpress; // pressure - here I am using pressure as read from the table with pressure been previous interpolated by the eos
-                if ( BCpress < Tpressmin or  BCpress > Tpressmax ){
-                        printf("pressure is outside of the table's range \n");
-                        printf("pressure was set \n");
-                        printf("pressure = %6.40lf \n", BCpress);
-                }
+                //if ( BCpress < Tpressmin or  BCpress > Tpressmax ){
+                //        printf("pressure is outside of the table's range \n");
+                //        printf("pressure was set \n");
+                //        printf("pressure = %6.40lf \n", BCpress);
+                //}
                 table->data(2 , BCntheta, BCnphi, BCnt ) = BCvr;      // v_r
-                if ( BCvr <  Tvrmin or  BCvr > Tvrmax ){
-                        printf("vr is outside of the table's range \n");
-                        printf("vr was set \n");
-                        printf("vr = %640lf \n", BCvr);
-                }
+                //if ( BCvr <  Tvrmin or  BCvr > Tvrmax ){
+                //        printf("vr is outside of the table's range \n");
+                //        printf("vr was set \n");
+                //        printf("vr = %640lf \n", BCvr);
+                //}
                 table->data(3 , BCntheta, BCnphi, BCnt ) = BCvt;      // v_theta
-                if ( BCvt <  Tvtmin or  BCvt >  Tvtmax ){
-                        printf("vt is outside of the table's range \n");
-                        printf("vt was set \n");
-                        printf("vt = %6.40lf \n", BCvt);
-                }
+                //if ( BCvt <  Tvtmin or  BCvt >  Tvtmax ){
+                //        printf("vt is outside of the table's range \n");
+                //        printf("vt was set \n");
+                //        printf("vt = %6.40lf \n", BCvt);
+                //}
                 table->data(4 , BCntheta, BCnphi, BCnt ) = BCvp;      // v_phi
-                if ( BCvp <  Tvpmin or  BCvp >  Tvpmax ){
-                        printf("vp is outside of the table's range \n");
-                        printf("vp was set \n");
-                        printf("vp = %6.40lf \n", BCvp);
-                }
+                //if ( BCvp <  Tvpmin or  BCvp >  Tvpmax ){
+                //        printf("vp is outside of the table's range \n");
+                //        printf("vp was set \n");
+                //        printf("vp = %6.40lf \n", BCvp);
+                //}
                 table->data(5 , BCntheta, BCnphi, BCnt ) = BCinter;      // internal energy
                 table->data(6 , BCntheta, BCnphi, BCnt ) = BCWlorentz;   // lorentz factor
                 nline = nline+1;
@@ -554,7 +554,7 @@ void OutflowReader(const char *filename, InterpTable3D *table) {
                         }
                 }
         }
-	printf("Done with filling ghost zones \n ");
+	//printf("Done with filling ghost zones \n ");
 
 
         printf("checking how complete is the data table \n");
@@ -646,7 +646,11 @@ void InnerBoundary(MeshBlock *pmb, Coordinates *pcoord,
                   int il, int iu, int jl, int ju, int kl, int ku,
                   int ngh) {
 
-        printf("Entering BC condition \n");
+        //printf("Entering BC condition \n");
+
+        //printf("da = %6.40lf \n",da );
+	//printf("pa = %6.40lf \n",pa );
+
 
         float BCThetamaxval = BCThetamax + BCNghts*BCDtheta;
         float BCThetaminval = BCThetamin - BCNghts*BCDtheta;

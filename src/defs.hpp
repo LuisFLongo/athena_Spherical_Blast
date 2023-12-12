@@ -15,17 +15,17 @@
 
 // configure.py dict(definitions) string values:
 // problem generator
-#define PROBLEM_GENERATOR "blast_try5_BC_v9_3_GR"
+#define PROBLEM_GENERATOR "slotted_cylinder"
 
 // coordinate system
-#define COORDINATE_SYSTEM "schwarzschild"
+#define COORDINATE_SYSTEM "cartesian"
 
 // Riemann solver
 #define RIEMANN_SOLVER "hlle"
 
 // configure.py dict(definitions) Boolean values:
 // Equation of state
-#define EQUATION_OF_STATE "adiabatic"
+#define EQUATION_OF_STATE "isothermal"
 
 // use general EOS framework default=0 (false).
 #define GENERAL_EOS 0
@@ -34,7 +34,7 @@
 #define EOS_TABLE_ENABLED 0
 
 // non-barotropic equation of state (i.e. P not simply a func of rho)? default=1 (true)
-#define NON_BAROTROPIC_EOS 1
+#define NON_BAROTROPIC_EOS 0
 
 // include magnetic fields? default=0 (false)
 #define MAGNETIC_FIELDS_ENABLED 0
@@ -49,10 +49,10 @@
 #define RADIATION_ENABLED 0
 
 // enable special or general relativity? default=0 (false)
-#define RELATIVISTIC_DYNAMICS 1
+#define RELATIVISTIC_DYNAMICS 0
 
 // enable general relativity? default=0 (false)
-#define GENERAL_RELATIVITY 1
+#define GENERAL_RELATIVITY 0
 
 // enable GR frame transformations? default=0 (false)
 #define FRAME_TRANSFORMATIONS 0
@@ -70,7 +70,7 @@
 #define NO_FFT
 
 // MPI parallelization (MPI_PARALLEL or NOT_MPI_PARALLEL)
-#define MPI_PARALLEL
+#define NOT_MPI_PARALLEL
 
 // OpenMP parallelization (OPENMP_PARALLEL or NOT_OPENMP_PARALLEL)
 #define NOT_OPENMP_PARALLEL
@@ -86,18 +86,18 @@
 #define ENABLE_EXCEPTIONS
 
 // compiler options
-#define COMPILED_WITH "icpc"
-#define COMPILER_COMMAND "/cluster/intel/compilers_and_libraries_2018.3.222/linux/mpi/bin64/mpiicpc"
-#define COMPILED_WITH_OPTIONS " -O3 -std=c++11 -ipo -xhost -inline-forceinline -qopenmp-simd -qopt-prefetch=4 -qoverride-limits -diag-disable 3180  " // NOLINT
+#define COMPILED_WITH "g++"
+#define COMPILER_COMMAND "g++"
+#define COMPILED_WITH_OPTIONS " -O3 -std=c++11  " // NOLINT
 
 //----------------------------------------------------------------------------------------
 // macros associated with numerical algorithm (rarely modified)
 
-#define NHYDRO 5
+#define NHYDRO 4
 #define NFIELD 0
-#define NWAVE 5
-#define NSCALARS 0
-#define NGHOST 4
+#define NWAVE 4
+#define NSCALARS 1
+#define NGHOST 2
 #define MAX_NSTAGE 6     // maximum number of stages per cycle for time-integrator
 #define MAX_NREGISTER 3  // maximum number of (u, b) register pairs for time-integrator
 

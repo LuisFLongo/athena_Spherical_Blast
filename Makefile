@@ -3,19 +3,19 @@
 
 # Files for conditional compilation
 
-PROBLEM_FILE = blast_try5_BC_v9_3_GR.cpp
-COORDINATES_FILE = schwarzschild.cpp
-EOS_FILE = adiabatic_hydro_gr.cpp
+PROBLEM_FILE = slotted_cylinder.cpp
+COORDINATES_FILE = cartesian.cpp
+EOS_FILE = isothermal_hydro.cpp
 GENERAL_EOS_FILE = noop.cpp
-RSOLVER_FILE = hlle_rel_no_transform.cpp
+RSOLVER_FILE = hlle.cpp
 RSOLVER_DIR = hydro/
 MPIFFT_FILE =  
 
 # General compiler specifications
 
-CXX := /cluster/intel/compilers_and_libraries_2018.3.222/linux/mpi/bin64/mpiicpc
+CXX := g++
 CPPFLAGS := 
-CXXFLAGS := -O3 -std=c++11 -ipo -xhost -inline-forceinline -qopenmp-simd -qopt-prefetch=4 -qoverride-limits -diag-disable 3180
+CXXFLAGS := -O3 -std=c++11
 LDFLAGS := 
 LDLIBS := 
 GCOV_CMD := gcov

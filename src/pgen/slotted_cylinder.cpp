@@ -209,10 +209,10 @@ void MeshBlock::ProblemGenerator(ParameterInput *pin) {
       for (int i=is; i<=ie; i++) {
         // background fluid:
         phydro->u(IDN,k,j,i) = d0;
-        phydro->u(IM1,k,j,i) = -d0*TWO_PI*omega*(pcoord->x2v(j)
-                                              - omega_x2)*phydro->u(IDN,k,j,i);
-        phydro->u(IM2,k,j,i) = d0*TWO_PI*omega*(pcoord->x1v(i)
-                                             - omega_x1)*phydro->u(IDN,k,j,i);
+        phydro->u(IM1,k,j,i) = 0.01;//-d0*TWO_PI*omega*(pcoord->x2v(j)
+                                   //           - omega_x2)*phydro->u(IDN,k,j,i);
+        phydro->u(IM2,k,j,i) = 0.01;//d0*TWO_PI*omega*(pcoord->x1v(i)
+                                   //          - omega_x1)*phydro->u(IDN,k,j,i);
         phydro->u(IM3,k,j,i) = 0.0;
         // assuming isothermal EOS:
         //  phydro->u(IEN,k,j,i) =

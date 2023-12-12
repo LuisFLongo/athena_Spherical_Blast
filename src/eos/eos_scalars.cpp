@@ -38,7 +38,6 @@ void EquationOfState::PassiveScalarConservedToPrimitive(
 #pragma omp simd
         for (int i=il; i<=iu; ++i) {
           const Real &d  = u(IDN,k,j,i);
-          const Real di = 1.0/d;
 
           //for (int n=0; n<NSCALARS; ++n) {
           Real& s_n  = s(n,k,j,i);
@@ -46,7 +45,7 @@ void EquationOfState::PassiveScalarConservedToPrimitive(
           // apply passive scalars floor to conserved variable first, then transform:
           // (multi-D fluxes may have caused it to drop below floor)
           s_n = (s_n < scalar_floor_ * d) ?  scalar_floor_ * d : s_n;
-          r_n = s_n * di;
+          r_n = s_n/d;
           // TODO(felker): continue to monitor the acceptability of this absolute 0. floor
           // (may create very large global conservation violations, e.g. the first few
           // cycles of the slotted cylinder test)
@@ -166,12 +165,10 @@ void EquationOfState::ApplyPassiveScalarFloors(AthenaArray<Real> &r, int n, int 
 
   // currently, assumes same floor is applied to all NSCALARS species
   // TODO(felker): generalize this to allow separate floors per species
-  for (int n=0; n<NSCALARS; ++n) {
-    Real& r_n  = r(n,i);
-    // apply (prim) dimensionless concentration floor WITHOUT adjusting passive scalar
-    // mass (conserved), unlike in floor in standard EOS
-    r_n = (r_n > scalar_floor_) ?  r_n : scalar_floor_;
-  }
+  Real& r_n  = r(n,i);
+  // apply (prim) dimensionless concentration floor WITHOUT adjusting passive scalar
+  // mass (conserved), unlike in floor in standard EOS
+  r_n = (r_n > scalar_floor_) ?  r_n : scalar_floor_;
   return;
 }
 

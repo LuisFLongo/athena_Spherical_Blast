@@ -34,14 +34,18 @@
 
 // Athena++ headers
 #include "athena.hpp"
+#include "chem_rad/chem_rad.hpp"
 #include "fft/turbulence.hpp"
 #include "globals.hpp"
 #include "gravity/fft_gravity.hpp"
 #include "gravity/mg_gravity.hpp"
 #include "mesh/mesh.hpp"
+#include "nr_radiation/implicit/radiation_implicit.hpp"
+#include "nr_radiation/radiation.hpp"
 #include "outputs/io_wrapper.hpp"
 #include "outputs/outputs.hpp"
 #include "parameter_input.hpp"
+#include "task_list/chem_rad_task_list.hpp"
 #include "utils/utils.hpp"
 
 // MPI/OpenMP headers
@@ -226,9 +230,10 @@ int main(int argc, char *argv[]) {
     if (res_flag == 1) {
       restartfile.Open(restart_filename, IOWrapper::FileMode::read);
       pinput->LoadFromFile(restartfile);
-      // If both -r and -i are specified, make sure next_time gets corrected.
+      // make sure next_time gets corrected in case -i input file or cmdline args change
+      // the output next_time, dt, etc.
       // This needs to be corrected on the restart file because we need the old dt.
-      if (iarg_flag == 1) pinput->RollbackNextTime();
+      pinput->RollbackNextTime();
       // leave the restart file open for later use
     }
     if (iarg_flag == 1) {
@@ -295,8 +300,9 @@ int main(int argc, char *argv[]) {
 #endif // ENABLE_EXCEPTIONS
 
   // With current mesh time possibly read from restart file, correct next_time for outputs
-  if (iarg_flag == 1 && res_flag == 1) {
-    // if both -r and -i are specified, ensure that next_time  >= mesh_time - dt
+  if (res_flag == 1) {
+    // ensure that next_time  >= mesh_time - dt, in case input file or command line
+    // overrides it
     pinput->ForwardNextTime(pmesh->time);
   }
 
@@ -346,6 +352,26 @@ int main(int argc, char *argv[]) {
     try {
 #endif
       pststlist = new SuperTimeStepTaskList(pinput, pmesh, ptlist);
+#ifdef ENABLE_EXCEPTIONS
+    }
+    catch(std::bad_alloc& ba) {
+      std::cout << "### FATAL ERROR in main" << std::endl << "memory allocation failed "
+                << "in creating task list " << ba.what() << std::endl;
+#ifdef MPI_PARALLEL
+      MPI_Finalize();
+#endif
+      return(0);
+    }
+#endif // ENABLE_EXCEPTIONS
+  }
+
+  // chemistry radiation
+  ChemRadiationIntegratorTaskList *pchemradlist = nullptr;
+  if (CHEMRADIATION_ENABLED) {
+#ifdef ENABLE_EXCEPTIONS
+    try {
+#endif
+      pchemradlist = new ChemRadiationIntegratorTaskList(pinput, pmesh);
 #ifdef ENABLE_EXCEPTIONS
     }
     catch(std::bad_alloc& ba) {
@@ -456,6 +482,28 @@ int main(int argc, char *argv[]) {
 
     if (pmesh->turb_flag > 1) pmesh->ptrbd->Driving(); // driven turbulence
 
+    // chemistry with radiation
+    if (CHEMRADIATION_ENABLED) {
+      clock_t tstart_rad, tstop_rad;
+      tstart_rad = std::clock();
+
+      pchemradlist->DoTaskListOneStage(pmesh, 1);
+
+      // radiation tasklist timing output
+      if (pmesh->my_blocks(0)->pchemrad->output_zone_sec) {
+        tstop_rad = std::clock();
+        double cpu_time = (tstop_rad>tstart_rad ?
+            static_cast<double> (tstop_rad-tstart_rad) :
+            1.0)/static_cast<double> (CLOCKS_PER_SEC);
+        std::uint64_t nzones =
+          static_cast<std::uint64_t> (pmesh->my_blocks(0)->GetNumberOfMeshBlockCells());
+        // double zone_sec = static_cast<double> (nzones) / cpu_time;
+        printf("ChemRadiation tasklist: ");
+        printf("ncycle = %d, total time in sec = %.2e, zone/sec=%.2e\n",
+            pmesh->ncycle, cpu_time, Real(nzones)/cpu_time);
+      }
+    }
+
     for (int stage=1; stage<=ptlist->nstages; ++stage) {
       ptlist->DoTaskListOneStage(pmesh, stage);
       if (ptlist->CheckNextMainStage(stage)) {
@@ -463,6 +511,9 @@ int main(int argc, char *argv[]) {
           pmesh->pfgrd->Solve(stage, 0);
         else if (SELF_GRAVITY_ENABLED == 2) // multigrid
           pmesh->pmgrd->Solve(stage);
+      }
+      if (IM_RADIATION_ENABLED) {
+        pmesh->pimrad->Iteration(pmesh,ptlist,stage);
       }
     }
 
@@ -518,8 +569,15 @@ int main(int argc, char *argv[]) {
   if (Globals::my_rank == 0 && wtlim > 0)
     SignalHandler::CancelWallTimeAlarm();
 
+
   //--- Step 9. --------------------------------------------------------------------------
-  // Make the final outputs
+  // Output the final cycle diagnostics and make the final outputs
+
+  if (Globals::my_rank == 0)
+    pmesh->OutputCycleDiagnostics();
+
+  pmesh->UserWorkAfterLoop(pinput);
+
 #ifdef ENABLE_EXCEPTIONS
   try {
 #endif
@@ -543,12 +601,10 @@ int main(int argc, char *argv[]) {
   }
 #endif // ENABLE_EXCEPTIONS
 
-  pmesh->UserWorkAfterLoop(pinput);
-
   //--- Step 10. -------------------------------------------------------------------------
   // Print diagnostic messages related to the end of the simulation
+
   if (Globals::my_rank == 0) {
-    pmesh->OutputCycleDiagnostics();
     if (SignalHandler::GetSignalFlag(SIGTERM) != 0) {
       std::cout << std::endl << "Terminating on Terminate signal" << std::endl;
     } else if (SignalHandler::GetSignalFlag(SIGINT) != 0) {
@@ -595,6 +651,7 @@ int main(int argc, char *argv[]) {
   delete pmesh;
   delete ptlist;
   delete pouts;
+  delete pchemradlist;
 
 #ifdef MPI_PARALLEL
   MPI_Finalize();

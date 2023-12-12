@@ -29,7 +29,11 @@
 #include "../athena.hpp"
 #include "../athena_arrays.hpp"
 #include "../bvals/bvals.hpp"
+#include "../bvals/sixray/bvals_sixray.hpp"
+#include "../chem_rad/chem_rad.hpp"
+#include "../chem_rad/integrators/rad_integrators.hpp"
 #include "../coordinates/coordinates.hpp"
+#include "../cr/cr.hpp"
 #include "../eos/eos.hpp"
 #include "../fft/athena_fft.hpp"
 #include "../fft/turbulence.hpp"
@@ -42,11 +46,14 @@
 #include "../hydro/hydro.hpp"
 #include "../hydro/hydro_diffusion/hydro_diffusion.hpp"
 #include "../multigrid/multigrid.hpp"
+#include "../nr_radiation/implicit/radiation_implicit.hpp"
+#include "../nr_radiation/radiation.hpp"
 #include "../orbital_advection/orbital_advection.hpp"
 #include "../outputs/io_wrapper.hpp"
 #include "../parameter_input.hpp"
 #include "../reconstruct/reconstruction.hpp"
 #include "../scalars/scalars.hpp"
+#include "../units/units.hpp"
 #include "../utils/buffer_utils.hpp"
 #include "mesh.hpp"
 #include "mesh_refinement.hpp"
@@ -99,14 +106,14 @@ Mesh::Mesh(ParameterInput *pin, int mesh_test) :
     sts_loc(TaskType::main_int),
     muj(), nuj(), muj_tilde(), gammaj_tilde(),
     nbnew(), nbdel(),
-    step_since_lb(), gflag(), turb_flag(), amr_updated(multilevel),
+    step_since_lb(), turb_flag(), amr_updated(multilevel),
     // private members:
     next_phys_id_(), num_mesh_threads_(pin->GetOrAddInteger("mesh", "num_threads", 1)),
     gids_(), gide_(),
     tree(this),
     use_uniform_meshgen_fn_{true, true, true},
     nreal_user_mesh_data_(), nint_user_mesh_data_(), nuser_history_output_(),
-    four_pi_G_(), grav_eps_(-1.0),
+    four_pi_G_(-1.0),
     lb_flag_(true), lb_automatic_(), lb_manual_(),
     MeshGenerator_{UniformMeshGeneratorX1, UniformMeshGeneratorX2,
                    UniformMeshGeneratorX3},
@@ -114,11 +121,9 @@ Mesh::Mesh(ParameterInput *pin, int mesh_test) :
     AMRFlag_{}, UserSourceTerm_{}, UserTimeStep_{}, ViscosityCoeff_{},
     ConductionCoeff_{}, FieldDiffusivity_{},
     OrbitalVelocity_{}, OrbitalVelocityDerivative_{nullptr, nullptr},
-    MGGravityBoundaryFunction_{MGPeriodicInnerX1, MGPeriodicOuterX1, MGPeriodicInnerX2,
-                               MGPeriodicOuterX2, MGPeriodicInnerX3, MGPeriodicOuterX3} {
+    MGGravityBoundaryFunction_{nullptr, nullptr, nullptr, nullptr, nullptr, nullptr},
+    MGGravitySourceMaskFunction_{} {
   std::stringstream msg;
-  RegionSize block_size;
-  MeshBlock *pfirst{};
   BoundaryFlag block_bcs[6];
   std::int64_t nbmax;
 
@@ -317,6 +322,9 @@ Mesh::Mesh(ParameterInput *pin, int mesh_test) :
   } else {
     max_level = 63;
   }
+
+  // initialize units
+  punit = new Units(pin);
 
   if (EOS_TABLE_ENABLED) peos_table = new EosTable(pin);
   InitUserMeshData(pin);
@@ -521,14 +529,15 @@ Mesh::Mesh(ParameterInput *pin, int mesh_test) :
 
 
   if (SELF_GRAVITY_ENABLED == 1) {
-    gflag = 1; // set gravity flag
     pfgrd = new FFTGravityDriver(this, pin);
   } else if (SELF_GRAVITY_ENABLED == 2) {
     // MGDriver must be initialzied before MeshBlocks
     pmgrd = new MGGravityDriver(this, pin);
   }
-  //  if (SELF_GRAVITY_ENABLED == 2 && ...) // independent allocation
-  //    gflag = 2;
+
+  if (IM_RADIATION_ENABLED) {
+    pimrad = new IMRadiation(this, pin);
+  }
 
   // create MeshBlock list for this process
   gids_ = nslist[Globals::my_rank];
@@ -539,7 +548,7 @@ Mesh::Mesh(ParameterInput *pin, int mesh_test) :
   for (int i=gids_; i<=gide_; i++) {
     SetBlockSizeAndBoundaries(loclist[i], block_size, block_bcs);
     my_blocks(i-gids_) = new MeshBlock(i, i-gids_, loclist[i], block_size, block_bcs,
-                                       this, pin, gflag);
+                                       this, pin);
     my_blocks(i-gids_)->pbval->SearchAndSetNeighbors(tree, ranklist, nslist);
   }
 
@@ -592,14 +601,14 @@ Mesh::Mesh(ParameterInput *pin, IOWrapper& resfile, int mesh_test) :
     sts_loc(TaskType::main_int),
     muj(), nuj(), muj_tilde(), gammaj_tilde(),
     nbnew(), nbdel(),
-    step_since_lb(), gflag(), turb_flag(), amr_updated(multilevel),
+    step_since_lb(), turb_flag(), amr_updated(multilevel),
     // private members:
     next_phys_id_(), num_mesh_threads_(pin->GetOrAddInteger("mesh", "num_threads", 1)),
     gids_(), gide_(),
     tree(this),
     use_uniform_meshgen_fn_{true, true, true},
     nreal_user_mesh_data_(), nint_user_mesh_data_(), nuser_history_output_(),
-    four_pi_G_(), grav_eps_(-1.0),
+    four_pi_G_(-1.0),
     lb_flag_(true), lb_automatic_(), lb_manual_(),
     MeshGenerator_{UniformMeshGeneratorX1, UniformMeshGeneratorX2,
                    UniformMeshGeneratorX3},
@@ -607,12 +616,10 @@ Mesh::Mesh(ParameterInput *pin, IOWrapper& resfile, int mesh_test) :
     AMRFlag_{}, UserSourceTerm_{}, UserTimeStep_{}, ViscosityCoeff_{},
     ConductionCoeff_{}, FieldDiffusivity_{},
     OrbitalVelocity_{}, OrbitalVelocityDerivative_{nullptr, nullptr},
-    MGGravityBoundaryFunction_{MGPeriodicInnerX1, MGPeriodicOuterX1, MGPeriodicInnerX2,
-                        MGPeriodicOuterX2, MGPeriodicInnerX3, MGPeriodicOuterX3} {
+    MGGravityBoundaryFunction_{nullptr, nullptr, nullptr, nullptr, nullptr, nullptr},
+    MGGravitySourceMaskFunction_{} {
   std::stringstream msg;
-  RegionSize block_size;
   BoundaryFlag block_bcs[6];
-  MeshBlock *pfirst{};
   IOWrapperSizeT *offset{};
   IOWrapperSizeT datasize, listsize, headeroffset;
 
@@ -723,6 +730,9 @@ Mesh::Mesh(ParameterInput *pin, IOWrapper& resfile, int mesh_test) :
   } else {
     max_level = 63;
   }
+
+  // initialize units
+  punit = new Units(pin);
 
   if (EOS_TABLE_ENABLED) peos_table = new EosTable(pin);
   InitUserMeshData(pin);
@@ -846,44 +856,69 @@ Mesh::Mesh(ParameterInput *pin, IOWrapper& resfile, int mesh_test) :
   }
 
   if (SELF_GRAVITY_ENABLED == 1) {
-    gflag = 1; // set gravity flag
     pfgrd = new FFTGravityDriver(this, pin);
   } else if (SELF_GRAVITY_ENABLED == 2) {
     // MGDriver must be initialzied before MeshBlocks
     pmgrd = new MGGravityDriver(this, pin);
   }
-  //  if (SELF_GRAVITY_ENABLED == 2 && ...) // independent allocation
-  //    gflag=2;
+
+  if (IM_RADIATION_ENABLED) {
+    pimrad = new IMRadiation(this, pin);
+  }
+
 
   // allocate data buffer
+  int nbmin = nblist[0];
+  for (int n = 1; n < Globals::nranks; ++n) {
+    if (nbmin > nblist[n])
+      nbmin = nblist[n];
+  }
   nblocal = nblist[Globals::my_rank];
   gids_ = nslist[Globals::my_rank];
   gide_ = gids_ + nblocal - 1;
-  char *mbdata = new char[datasize*nblocal];
+  char *mbdata = new char[datasize];
   my_blocks.NewAthenaArray(nblocal);
-  // load MeshBlocks (parallel)
-  if (resfile.Read_at_all(mbdata, datasize, nblocal, headeroffset+gids_*datasize) !=
-      static_cast<unsigned int>(nblocal)) {
-    msg << "### FATAL ERROR in Mesh constructor" << std::endl
-        << "The restart file is broken or input parameters are inconsistent."
-        << std::endl;
-    ATHENA_ERROR(msg);
-  }
   for (int i=gids_; i<=gide_; i++) {
+    if (i - gids_ < nbmin) {
+      // load MeshBlock (parallel)
+      if (resfile.Read_at_all(mbdata, datasize, 1, headeroffset+i*datasize) != 1) {
+        msg << "### FATAL ERROR in Mesh constructor" << std::endl
+            << "The restart file is broken or input parameters are inconsistent."
+            << std::endl;
+        ATHENA_ERROR(msg);
+      }
+    } else {
+      // load MeshBlock (serial)
+      if (resfile.Read_at(mbdata, datasize, 1, headeroffset+i*datasize) != 1) {
+        msg << "### FATAL ERROR in Mesh constructor" << std::endl
+            << "The restart file is broken or input parameters are inconsistent."
+            << std::endl;
+        ATHENA_ERROR(msg);
+      }
+    }
     // Match fixed-width integer precision of IOWrapperSizeT datasize
-    std::uint64_t buff_os = datasize * (i-gids_);
     SetBlockSizeAndBoundaries(loclist[i], block_size, block_bcs);
     my_blocks(i-gids_) = new MeshBlock(i, i-gids_, this, pin, loclist[i], block_size,
-                                       block_bcs, costlist[i], mbdata+buff_os, gflag);
+                                       block_bcs, costlist[i], mbdata);
     my_blocks(i-gids_)->pbval->SearchAndSetNeighbors(tree, ranklist, nslist);
   }
   delete [] mbdata;
   // check consistency
-  if (datasize != my_blocks(0)->GetBlockSizeInBytes()) {
-    msg << "### FATAL ERROR in Mesh constructor" << std::endl
-        << "The restart file is broken or input parameters are inconsistent."
-        << std::endl;
-    ATHENA_ERROR(msg);
+  if ( (NR_RADIATION_ENABLED || IM_RADIATION_ENABLED) &&
+                    my_blocks(0)->pnrrad->restart_from_gray > 0) {
+    if (datasize != my_blocks(0)->GetBlockSizeInBytesGray()) {
+        msg << "### FATAL ERROR in Mesh constructor" << std::endl
+            << "The restart file is broken or input parameters are inconsistent."
+            << std::endl;
+        ATHENA_ERROR(msg);
+    }
+  } else {
+    if (datasize != my_blocks(0)->GetBlockSizeInBytes()) {
+        msg << "### FATAL ERROR in Mesh constructor" << std::endl
+            << "The restart file is broken or input parameters are inconsistent."
+            << std::endl;
+        ATHENA_ERROR(msg);
+    }
   }
 
   ResetLoadBalanceVariables();
@@ -899,6 +934,7 @@ Mesh::Mesh(ParameterInput *pin, IOWrapper& resfile, int mesh_test) :
 //! destructor
 
 Mesh::~Mesh() {
+  delete punit;
   for (int b=0; b<nblocal; ++b)
     delete my_blocks(b);
   delete [] nslist;
@@ -908,6 +944,7 @@ Mesh::~Mesh() {
   delete [] loclist;
   if (SELF_GRAVITY_ENABLED == 1) delete pfgrd;
   else if (SELF_GRAVITY_ENABLED == 2) delete pmgrd;
+  if (IM_RADIATION_ENABLED) delete pimrad;
   if (turb_flag > 0) delete ptrbd;
   if (adaptive) { // deallocate arrays for AMR
     delete [] nref;
@@ -935,7 +972,6 @@ Mesh::~Mesh() {
 //! \brief print the mesh structure information
 
 void Mesh::OutputMeshStructure(int ndim) {
-  RegionSize block_size;
   BoundaryFlag block_bcs[6];
   FILE *fp = nullptr;
 
@@ -1085,6 +1121,11 @@ void Mesh::OutputMeshStructure(int ndim) {
 //!        this assumes that phydro->NewBlockTimeStep is already called
 
 void Mesh::NewTimeStep() {
+  //this is called at the end of Mesh::Initialize()
+  if (fluid_setup == FluidFormulation::fixed) {
+    dt = tlim/nlim;
+    return;
+  }
   MeshBlock *pmb = my_blocks(0);
 
   // prevent timestep from growing too fast in between 2x cycles (even if every MeshBlock
@@ -1134,7 +1175,7 @@ void Mesh::NewTimeStep() {
 void Mesh::EnrollUserBoundaryFunction(BoundaryFace dir, BValFunc my_bc) {
   std::stringstream msg;
   if (dir < 0 || dir > 5) {
-    msg << "### FATAL ERROR in EnrollBoundaryCondition function" << std::endl
+    msg << "### FATAL ERROR in EnrollUserBoundaryFunction" << std::endl
         << "dirName = " << dir << " not valid" << std::endl;
     ATHENA_ERROR(msg);
   }
@@ -1148,6 +1189,13 @@ void Mesh::EnrollUserBoundaryFunction(BoundaryFace dir, BValFunc my_bc) {
   return;
 }
 
+//! \deprecated (felker):
+//! * provide trivial overloads for old-style BoundaryFace enum argument
+void Mesh::EnrollUserBoundaryFunction(int dir, BValFunc my_bc) {
+  EnrollUserBoundaryFunction(static_cast<BoundaryFace>(dir), my_bc);
+  return;
+}
+
 //----------------------------------------------------------------------------------------
 //! \fn void Mesh::EnrollUserMGGravityBoundaryFunction(BoundaryFace dir,
 //!                                                    MGBoundaryFunc my_bc)
@@ -1156,7 +1204,7 @@ void Mesh::EnrollUserBoundaryFunction(BoundaryFace dir, BValFunc my_bc) {
 void Mesh::EnrollUserMGGravityBoundaryFunction(BoundaryFace dir, MGBoundaryFunc my_bc) {
   std::stringstream msg;
   if (dir < 0 || dir > 5) {
-    msg << "### FATAL ERROR in EnrollBoundaryCondition function" << std::endl
+    msg << "### FATAL ERROR in EnrollUserMGGravityBoundaryFunction" << std::endl
         << "dirName = " << dir << " not valid" << std::endl;
     ATHENA_ERROR(msg);
   }
@@ -1164,17 +1212,67 @@ void Mesh::EnrollUserMGGravityBoundaryFunction(BoundaryFace dir, MGBoundaryFunc 
   return;
 }
 
-//! \deprecated (felker):
-//! * provide trivial overloads for old-style BoundaryFace enum argument
-void Mesh::EnrollUserBoundaryFunction(int dir, BValFunc my_bc) {
-  EnrollUserBoundaryFunction(static_cast<BoundaryFace>(dir), my_bc);
+//----------------------------------------------------------------------------------------
+//! \fn void Mesh::EnrollUserMGGravitySourceMaskFunction(MGSourceMaskFunc srcmask)
+//  \brief Enroll a user-defined Multigrid gravity source mask function
+
+void Mesh::EnrollUserMGGravitySourceMaskFunction(MGSourceMaskFunc srcmask) {
+  MGGravitySourceMaskFunction_ = srcmask;
   return;
 }
 
-void Mesh::EnrollUserMGGravityBoundaryFunction(int dir, MGBoundaryFunc my_bc) {
-  EnrollUserMGGravityBoundaryFunction(static_cast<BoundaryFace>(dir), my_bc);
+
+//----------------------------------------------------------------------------------------
+// radiation related boundaries
+
+void Mesh::EnrollUserRadBoundaryFunction(BoundaryFace dir, RadBoundaryFunc my_bc) {
+  std::stringstream msg;
+  if (dir < 0 || dir > 5) {
+    msg << "### FATAL ERROR in EnrollUserRadBoundaryCondition function" << std::endl
+        << "dirName = " << dir << " not valid" << std::endl;
+    ATHENA_ERROR(msg);
+  }
+  if (mesh_bcs[dir] != BoundaryFlag::user) {
+    msg << "### FATAL ERROR in EnrollUserRadBoundaryFunction" << std::endl
+        << "The boundary condition flag must be set to the string 'user' in the "
+        << " <mesh> block in the input file to use user-enrolled BCs" << std::endl;
+    ATHENA_ERROR(msg);
+  }
+  RadBoundaryFunc_[static_cast<int>(dir)]=my_bc;
   return;
 }
+
+//! * provide trivial overloads for old-style BoundaryFace enum argument
+void Mesh::EnrollUserRadBoundaryFunction(int dir, RadBoundaryFunc my_bc) {
+  EnrollUserRadBoundaryFunction(static_cast<BoundaryFace>(dir), my_bc);
+  return;
+}
+
+
+void Mesh::EnrollUserCRBoundaryFunction(BoundaryFace dir, CRBoundaryFunc my_bc) {
+  std::stringstream msg;
+  if (dir < 0 || dir > 5) {
+    msg << "### FATAL ERROR in EnrollUserCRBoundaryCondition function" << std::endl
+        << "dirName = " << dir << " not valid" << std::endl;
+    ATHENA_ERROR(msg);
+  }
+  if (mesh_bcs[dir] != BoundaryFlag::user) {
+    msg << "### FATAL ERROR in EnrollUserCRBoundaryFunction" << std::endl
+        << "The boundary condition flag must be set to the string 'user' in the "
+        << " <mesh> block in the input file to use user-enrolled BCs" << std::endl;
+    ATHENA_ERROR(msg);
+  }
+  CRBoundaryFunc_[static_cast<int>(dir)]=my_bc;
+  return;
+}
+
+void Mesh::EnrollUserCRBoundaryFunction(int dir, CRBoundaryFunc my_bc) {
+  EnrollUserCRBoundaryFunction(static_cast<BoundaryFace>(dir), my_bc);
+  return;
+}
+
+
+
 
 //----------------------------------------------------------------------------------------
 //! \fn void Mesh::EnrollUserRefinementCondition(AMRFlagFunc amrflag)
@@ -1388,6 +1486,14 @@ void Mesh::Initialize(int res_flag, ParameterInput *pin) {
     if (((turb_flag == 1) || (turb_flag == 2)) && (res_flag == 0))
       ptrbd->Driving();
 
+    //initialize ODE solver for chemistry
+    if (CHEMISTRY_ENABLED) {
+      for (int i=0; i<nblocal; ++i) {
+        MeshBlock *pmb = my_blocks(i);
+        pmb->pscalars->odew.Initialize(pin);
+      }
+    }
+
     // Create send/recv MPI_Requests for all BoundaryData objects
 #pragma omp parallel for num_threads(nthreads)
     for (int i=0; i<nblocal; ++i) {
@@ -1395,8 +1501,14 @@ void Mesh::Initialize(int res_flag, ParameterInput *pin) {
       // BoundaryVariable objects evolved in main TimeIntegratorTaskList:
       pmb->pbval->SetupPersistentMPI();
       // other BoundaryVariable objects:
-      if (SELF_GRAVITY_ENABLED == 1)
+      if (SELF_GRAVITY_ENABLED == 1
+        || (SELF_GRAVITY_ENABLED == 2 && pmb->pgrav->fill_ghost))
         pmb->pgrav->gbvar.SetupPersistentMPI();
+      if (CHEMRADIATION_ENABLED && CHEMISTRY_ENABLED) {
+        pmb->pchemrad->pchemradintegrator->col_bvar.SetupPersistentMPI();
+      }
+      if (IM_RADIATION_ENABLED)
+        pmb->pnrrad->rad_bvar.SetupPersistentMPI();
     }
 
     // solve gravity for the first time
@@ -1419,6 +1531,8 @@ void Mesh::Initialize(int res_flag, ParameterInput *pin) {
         }
         pbval->StartReceivingSubset(BoundaryCommSubset::mesh_init,
                                     pbval->bvars_main_int);
+        if (IM_RADIATION_ENABLED)
+          pmb->pnrrad->rad_bvar.StartReceiving(BoundaryCommSubset::radiation);
       }
 
       // send conserved variables
@@ -1431,10 +1545,22 @@ void Mesh::Initialize(int res_flag, ParameterInput *pin) {
         if (MAGNETIC_FIELDS_ENABLED)
           pmb->pfield->fbvar.SendBoundaryBuffers();
         // and (conserved variable) passive scalar masses:
-        if (NSCALARS > 0)
+        if (NSCALARS > 0) {
+          pmb->pscalars->sbvar.var_cc = &(pmb->pscalars->s);
+          if (pmb->pmy_mesh->multilevel) {
+            pmb->pscalars->sbvar.coarse_buf = &(pmb->pscalars->coarse_s_);
+          }
           pmb->pscalars->sbvar.SendBoundaryBuffers();
-      }
+        }
 
+
+        if (NR_RADIATION_ENABLED || IM_RADIATION_ENABLED) {
+          pmb->pnrrad->rad_bvar.SendBoundaryBuffers();
+        }
+        if (CR_ENABLED) {
+          pmb->pcr->cr_bvar.SendBoundaryBuffers();
+        }
+      }
       // wait to receive conserved variables
 #pragma omp for private(pmb,pbval)
       for (int i=0; i<nblocal; ++i) {
@@ -1444,11 +1570,22 @@ void Mesh::Initialize(int res_flag, ParameterInput *pin) {
           pmb->pfield->fbvar.ReceiveAndSetBoundariesWithWait();
         if (NSCALARS > 0)
           pmb->pscalars->sbvar.ReceiveAndSetBoundariesWithWait();
+
+        if (NR_RADIATION_ENABLED || IM_RADIATION_ENABLED)
+          pmb->pnrrad->rad_bvar.ReceiveAndSetBoundariesWithWait();
+        if (CR_ENABLED)
+          pmb->pcr->cr_bvar.ReceiveAndSetBoundariesWithWait();
+
         if (shear_periodic && orbital_advection==0) {
           pmb->phydro->hbvar.AddHydroShearForInit();
+
+          if (NR_RADIATION_ENABLED || IM_RADIATION_ENABLED)
+            pmb->pnrrad->rad_bvar.AddRadShearForInit();
         }
         pbval->ClearBoundarySubset(BoundaryCommSubset::mesh_init,
                                    pbval->bvars_main_int);
+        if (IM_RADIATION_ENABLED)
+          pmb->pnrrad->rad_bvar.ClearBoundary(BoundaryCommSubset::radiation);
       }
 
       // With AMR/SMR GR send primitives to enable cons->prim before prolongation
@@ -1470,6 +1607,9 @@ void Mesh::Initialize(int res_flag, ParameterInput *pin) {
           pmb->phydro->hbvar.SendBoundaryBuffers();
           if (NSCALARS > 0) {
             pmb->pscalars->sbvar.var_cc = &(pmb->pscalars->r);
+            if (pmb->pmy_mesh->multilevel) {
+              pmb->pscalars->sbvar.coarse_buf = &(pmb->pscalars->coarse_r_);
+            }
             pmb->pscalars->sbvar.SendBoundaryBuffers();
           }
         }
@@ -1488,6 +1628,9 @@ void Mesh::Initialize(int res_flag, ParameterInput *pin) {
                                                HydroBoundaryQuantity::cons);
           if (NSCALARS > 0) {
             pmb->pscalars->sbvar.var_cc = &(pmb->pscalars->s);
+            if (pmb->pmy_mesh->multilevel) {
+              pmb->pscalars->sbvar.coarse_buf = &(pmb->pscalars->coarse_s_);
+            }
           }
         }
       } // multilevel
@@ -1556,6 +1699,16 @@ void Mesh::Initialize(int res_flag, ParameterInput *pin) {
           // for MHD, shrink buffer by 3
           //! \todo (felker):
           //! * add MHD loop limit calculation for 4th order W(U)
+          // Apply physical boundaries prior to 4th order W(U)
+          ph->hbvar.SwapHydroQuantity(ph->w, HydroBoundaryQuantity::prim);
+          if (NSCALARS > 0) {
+            ps->sbvar.var_cc = &(ps->r);
+            if (pmb->pmy_mesh->multilevel) {
+              ps->sbvar.coarse_buf = &(ps->coarse_r_);
+            }
+          }
+          pbval->ApplyPhysicalBoundaries(time, 0.0, pbval->bvars_main_int);
+          // Perform 4th order W(U)
           pmb->peos->ConservedToPrimitiveCellAverage(ph->u, ph->w1, pf->b,
                                                      ph->w, pf->bcc, pmb->pcoord,
                                                      il, iu, jl, ju, kl, ku);
@@ -1570,10 +1723,33 @@ void Mesh::Initialize(int res_flag, ParameterInput *pin) {
         // Swap Hydro and (possibly) passive scalar quantities in BoundaryVariable
         // interface from conserved to primitive formulations:
         ph->hbvar.SwapHydroQuantity(ph->w, HydroBoundaryQuantity::prim);
-        if (NSCALARS > 0)
+        if (NSCALARS > 0) {
           ps->sbvar.var_cc = &(ps->r);
+          if (pmb->pmy_mesh->multilevel) {
+            ps->sbvar.coarse_buf = &(ps->coarse_r_);
+          }
+        }
 
         pbval->ApplyPhysicalBoundaries(time, 0.0, pbval->bvars_main_int);
+      }
+      // for radiation, calculate opacity and moments
+      if (NR_RADIATION_ENABLED || IM_RADIATION_ENABLED) {
+        for (int i=0; i<nblocal; ++i) {
+          pmb = my_blocks(i); ph = pmb->phydro;
+          NRRadiation *prad = pmb->pnrrad;
+          prad->UserFrequency(prad);
+          prad->CalculateMoment(prad->ir);
+          prad->UpdateOpacity(pmb,ph->w);
+        }
+      }
+      // calculate opacity
+      if (CR_ENABLED) {
+        for(int i=0; i<nblocal; ++i) {
+          pmb=my_blocks(i); ph=pmb->phydro;
+          CosmicRay *pcr = pmb->pcr;
+          pf=pmb->pfield;
+          pcr->UpdateOpacity(pmb,pcr->u_cr,ph->w,pf->bcc);
+        }
       }
 
       // Calc initial diffusion coefficients
@@ -1594,7 +1770,7 @@ void Mesh::Initialize(int res_flag, ParameterInput *pin) {
           my_blocks(i)->pmr->CheckRefinementCondition();
         }
       }
-    } // omp parallel
+    }
 
     if (!res_flag && adaptive) {
       iflag = false;
@@ -1810,6 +1986,9 @@ void Mesh::CorrectMidpointInitialCondition() {
     // no need to re-SetupPersistentMPI() the MPI requests for boundary values
     pbval->StartReceivingSubset(BoundaryCommSubset::mesh_init,
                                 pbval->bvars_main_int);
+
+    if (IM_RADIATION_ENABLED)
+      pmb->pnrrad->rad_bvar.StartReceiving(BoundaryCommSubset::radiation);
   }
 
 #pragma omp for private(pmb,pbval)
@@ -1821,8 +2000,18 @@ void Mesh::CorrectMidpointInitialCondition() {
     if (MAGNETIC_FIELDS_ENABLED)
       pmb->pfield->fbvar.SendBoundaryBuffers();
     // and (conserved variable) passive scalar masses:
-    if (NSCALARS > 0)
+    if (NSCALARS > 0) {
+      pmb->pscalars->sbvar.var_cc = &(pmb->pscalars->s);
+      if (pmb->pmy_mesh->multilevel) {
+        pmb->pscalars->sbvar.coarse_buf = &(pmb->pscalars->coarse_s_);
+      }
       pmb->pscalars->sbvar.SendBoundaryBuffers();
+    }
+
+    if (NR_RADIATION_ENABLED || IM_RADIATION_ENABLED)
+      pmb->pnrrad->rad_bvar.SendBoundaryBuffers();
+    if (CR_ENABLED)
+      pmb->pcr->cr_bvar.SendBoundaryBuffers();
   }
 
   // wait to receive conserved variables
@@ -1834,13 +2023,32 @@ void Mesh::CorrectMidpointInitialCondition() {
     pmb->phydro->hbvar.ReceiveAndSetBoundariesWithWait();
     if (MAGNETIC_FIELDS_ENABLED)
       pmb->pfield->fbvar.ReceiveAndSetBoundariesWithWait();
-    if (NSCALARS > 0)
+    if (NSCALARS > 0) {
+      pmb->pscalars->sbvar.var_cc = &(pmb->pscalars->s);
+      if (pmb->pmy_mesh->multilevel) {
+        pmb->pscalars->sbvar.coarse_buf = &(pmb->pscalars->coarse_s_);
+      }
       pmb->pscalars->sbvar.ReceiveAndSetBoundariesWithWait();
+    }
+
+
+    if (NR_RADIATION_ENABLED || IM_RADIATION_ENABLED)
+      pmb->pnrrad->rad_bvar.ReceiveAndSetBoundariesWithWait();
+    if (CR_ENABLED)
+      pmb->pcr->cr_bvar.ReceiveAndSetBoundariesWithWait();
+
+
     if (shear_periodic && orbital_advection==0) {
       pmb->phydro->hbvar.AddHydroShearForInit();
+      if (NR_RADIATION_ENABLED || IM_RADIATION_ENABLED) {
+        pmb->pnrrad->rad_bvar.AddRadShearForInit();
+      }
     }
     pbval->ClearBoundarySubset(BoundaryCommSubset::mesh_init,
                                pbval->bvars_main_int);
+    if (IM_RADIATION_ENABLED) {
+      pmb->pnrrad->rad_bvar.ClearBoundary(BoundaryCommSubset::radiation);
+    }
   } // end second exchange of ghost cells
   return;
 }
@@ -1892,6 +2100,15 @@ void Mesh::ReserveMeshBlockPhysIDs() {
   if (NSCALARS > 0) {
     ReserveTagPhysIDs(CellCenteredBoundaryVariable::max_phys_id);
   }
+  if (CHEMRADIATION_ENABLED) {
+    ReserveTagPhysIDs(SixRayBoundaryVariable::max_phys_id);
+  }
+  if (NR_RADIATION_ENABLED || IM_RADIATION_ENABLED) {
+    ReserveTagPhysIDs(RadBoundaryVariable::max_phys_id);
+  }
+  if (CR_ENABLED) {
+    ReserveTagPhysIDs(CellCenteredBoundaryVariable::max_phys_id);
+  }
 #endif
   return;
 }
@@ -1908,6 +2125,8 @@ FluidFormulation GetFluidFormulation(const std::string& input_string) {
     return FluidFormulation::disabled;
   } else if (input_string == "background") {
     return FluidFormulation::background;
+  } else if (input_string == "fixed") {
+    return FluidFormulation::fixed;
   } else {
     std::stringstream msg;
     msg << "### FATAL ERROR in GetFluidFormulation" << std::endl

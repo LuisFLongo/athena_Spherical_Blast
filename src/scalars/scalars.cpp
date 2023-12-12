@@ -42,7 +42,10 @@ PassiveScalars::PassiveScalars(MeshBlock *pmb, ParameterInput *pin)  :
     coarse_r_(NSCALARS, pmb->ncc3, pmb->ncc2, pmb->ncc1,
               (pmb->pmy_mesh->multilevel ? AthenaArray<Real>::DataStatus::allocated :
                AthenaArray<Real>::DataStatus::empty)),
-    sbvar(pmb, &s, &coarse_s_, s_flux),
+    sbvar(pmb, &s, &coarse_s_, s_flux, true),
+    //construct ptrs to objects related to solving chemistry source term.
+    chemnet(pmb, pin),
+    odew(pmb, pin),
     nu_scalar_iso{pin->GetOrAddReal("problem", "nu_scalar_iso", 0.0)},
     //nu_scalar_aniso{pin->GetOrAddReal("problem", "nu_scalar_aniso", 0.0)},
     scalar_diffusion_defined{(nu_scalar_iso > 0.0 ? true : false)},
@@ -67,7 +70,7 @@ PassiveScalars::PassiveScalars(MeshBlock *pmb, ParameterInput *pin)  :
 
   // If STS RKL2, allocate additional memory registers
   if (STS_ENABLED) {
-    std::string sts_integrator = pin->GetOrAddString("time", "sts_integrator", "rkl1");
+    std::string sts_integrator = pin->GetOrAddString("time", "sts_integrator", "rkl2");
     if (sts_integrator == "rkl2") {
       s0.NewAthenaArray(NSCALARS, nc3, nc2, nc1);
       s_fl_div.NewAthenaArray(NSCALARS, nc3, nc2, nc1);
@@ -134,4 +137,17 @@ PassiveScalars::PassiveScalars(MeshBlock *pmb, ParameterInput *pin)  :
     dx3_.NewAthenaArray(nc1);
     // nu_scalar_tot_.NewAthenaArray(nc1);
   }
+  if (CHEMISTRY_ENABLED) {
+    //allocate memory for the copy of s at intermediate step
+    //the +1 dimention is the energy equation
+    if (NON_BAROTROPIC_EOS) {
+      r_copy.NewAthenaArray(nc1, NSPECIES+1);
+    } else {
+      r_copy.NewAthenaArray(nc1, NSPECIES);
+    }
+    //next step size
+    h.NewAthenaArray(nc3, nc2, nc1);
+  }
 }
+
+PassiveScalars::~PassiveScalars() {}

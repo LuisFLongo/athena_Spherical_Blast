@@ -15,17 +15,17 @@
 
 // configure.py dict(definitions) string values:
 // problem generator
-#define PROBLEM_GENERATOR "slotted_cylinder"
+#define PROBLEM_GENERATOR "blast_try5_BC_v9_3_Ye_v1"
 
 // coordinate system
-#define COORDINATE_SYSTEM "cartesian"
+#define COORDINATE_SYSTEM "spherical_polar"
 
 // Riemann solver
-#define RIEMANN_SOLVER "hlle"
+#define RIEMANN_SOLVER "hllc"
 
 // configure.py dict(definitions) Boolean values:
 // Equation of state
-#define EQUATION_OF_STATE "isothermal"
+#define EQUATION_OF_STATE "adiabatic"
 
 // use general EOS framework default=0 (false).
 #define GENERAL_EOS 0
@@ -34,7 +34,7 @@
 #define EOS_TABLE_ENABLED 0
 
 // non-barotropic equation of state (i.e. P not simply a func of rho)? default=1 (true)
-#define NON_BAROTROPIC_EOS 0
+#define NON_BAROTROPIC_EOS 1
 
 // include magnetic fields? default=0 (false)
 #define MAGNETIC_FIELDS_ENABLED 0
@@ -70,10 +70,10 @@
 #define NO_FFT
 
 // MPI parallelization (MPI_PARALLEL or NOT_MPI_PARALLEL)
-#define NOT_MPI_PARALLEL
+#define MPI_PARALLEL
 
 // OpenMP parallelization (OPENMP_PARALLEL or NOT_OPENMP_PARALLEL)
-#define NOT_OPENMP_PARALLEL
+#define OPENMP_PARALLEL
 
 // HDF5 output (HDF5OUTPUT or NO_HDF5OUTPUT)
 #define NO_HDF5OUTPUT
@@ -87,17 +87,17 @@
 
 // compiler options
 #define COMPILED_WITH "g++"
-#define COMPILER_COMMAND "g++"
-#define COMPILED_WITH_OPTIONS " -O3 -std=c++11  " // NOLINT
+#define COMPILER_COMMAND "/cluster/intel/compilers_and_libraries_2018.3.222/linux/mpi/bin64/mpiicpc"
+#define COMPILED_WITH_OPTIONS " -O3 -std=c++11 -fopenmp  " // NOLINT
 
 //----------------------------------------------------------------------------------------
 // macros associated with numerical algorithm (rarely modified)
 
-#define NHYDRO 4
+#define NHYDRO 5
 #define NFIELD 0
-#define NWAVE 4
+#define NWAVE 5
 #define NSCALARS 1
-#define NGHOST 2
+#define NGHOST 4
 #define MAX_NSTAGE 6     // maximum number of stages per cycle for time-integrator
 #define MAX_NREGISTER 3  // maximum number of (u, b) register pairs for time-integrator
 
